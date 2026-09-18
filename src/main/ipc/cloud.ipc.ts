@@ -2,28 +2,23 @@ import { ipcMain } from 'electron';
 import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import fs from 'fs';
-import { config } from 'dotenv';
 import { uploadQueue } from '../services/UploadQueue';
+import { getGCSKeyPath } from '../lib/paths';
 
-// Load environment variables from .env
-config();
+// dotenv is loaded centrally in lib/env.ts (imported first by index.ts)
 
-
-// GCS Key Configuration
-const gcsKeyName = process.env.GCS_KEY_PATH || 'google-key.json';
-const keyPath = path.isAbsolute(gcsKeyName) 
-  ? gcsKeyName 
-  : path.join(process.cwd(), gcsKeyName);
+// GCS Key Configuration — production-safe path resolution
+const keyPath = getGCSKeyPath();
 
 let storage: Storage | null = null;
 
 try {
-  if (fs.existsSync(keyPath)) {
+  if (keyPath && fs.existsSync(keyPath)) {
     storage = new Storage({ keyFilename: keyPath });
     console.log(`[Cloud Storage] Initialized successfully with: ${path.basename(keyPath)}`);
   } else {
-    console.warn(`[Cloud Storage] Missing Google Cloud key at: ${keyPath}`);
-    console.warn('[Cloud Storage] Please set GCS_KEY_PATH in .env or place google-key.json in the root.');
+    console.warn(`[Cloud Storage] Missing Google Cloud key. Cloud upload will be disabled.`);
+    console.warn('[Cloud Storage] Place gcs-key.json in resources/ or set GCS_KEY_PATH in .env.');
   }
 } catch (error) {
   console.error('[Cloud Storage] Failed to initialize:', error);

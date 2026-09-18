@@ -1,3 +1,6 @@
+// MUST be first import — loads .env before any module reads process.env
+import './lib/env'
+
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'

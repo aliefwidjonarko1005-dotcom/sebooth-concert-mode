@@ -3,9 +3,9 @@ import { promisify } from 'util'
 import { existsSync, mkdirSync, writeFileSync, readFileSync, unlinkSync, statSync, rmSync, copyFileSync } from 'fs'
 // @ts-ignore - Ignore missing types for fluent-ffmpeg to prevent build failures
 import ffmpeg from 'fluent-ffmpeg'
-import ffmpegPath from '@ffmpeg-installer/ffmpeg'
+import { getFFmpegPath } from '../lib/paths'
 
-ffmpeg.setFfmpegPath(ffmpegPath.path)
+ffmpeg.setFfmpegPath(getFFmpegPath())
 import { dirname, join } from 'path'
 import { app } from 'electron'
 import { CameraHandler } from './CameraHandler'

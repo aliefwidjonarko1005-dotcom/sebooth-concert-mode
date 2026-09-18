@@ -5,10 +5,10 @@ import { APIResponse } from '@shared/types'
 import sharp from 'sharp'
 // @ts-ignore - Ignore missing types for fluent-ffmpeg to prevent build failures
 import ffmpeg from 'fluent-ffmpeg'
-import ffmpegPath from '@ffmpeg-installer/ffmpeg'
+import { getFFmpegPath } from '../lib/paths'
 import { getLocalIpAddress } from '../server'
 
-ffmpeg.setFfmpegPath(ffmpegPath.path)
+ffmpeg.setFfmpegPath(getFFmpegPath())
 
 /**
  * Register all system-related IPC handlers

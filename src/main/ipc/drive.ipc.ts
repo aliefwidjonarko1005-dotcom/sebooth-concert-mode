@@ -3,11 +3,9 @@ import { google } from 'googleapis'
 import fs from 'fs'
 import path from 'path'
 import url from 'url'
-import { config } from 'dotenv'
 import { app } from 'electron'
 
-// Load environment variables
-config()
+// dotenv is loaded centrally in lib/env.ts (imported first by index.ts)
 
 const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || ''
 

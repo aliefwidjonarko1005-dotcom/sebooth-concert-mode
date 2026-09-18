@@ -9,9 +9,10 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "postinstall": "electron-builder install-app-deps",
-    "build:win": "npm run build && electron-builder --win",
-    "build:mac": "npm run build && electron-builder --mac",
-    "build:linux": "npm run build && electron-builder --linux"
+    "prebuild:dist": "node scripts/copy-ffmpeg.js && node scripts/copy-gcs-key.js",
+    "build:win": "npm run prebuild:dist && npm run build && electron-builder --win",
+    "build:mac": "npm run prebuild:dist && npm run build && electron-builder --mac",
+    "build:linux": "npm run prebuild:dist && npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
@@ -63,15 +64,42 @@
     "directories": {
       "output": "dist"
     },
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/sharp/**",
+      "node_modules/@img/**",
+      "node_modules/usb/**",
+      "node_modules/pdf-to-printer/**"
+    ],
     "files": [
-      "out/**/*",
-      "resources/**/*"
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/",
+        "to": "resources/",
+        "filter": ["**/*"]
+      },
+      {
+        "from": ".env",
+        "to": ".env"
+      }
     ],
     "win": {
       "target": [
         "nsis"
       ],
       "icon": "resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "resources/icon.ico",
+      "uninstallerIcon": "resources/icon.ico",
+      "installerHeaderIcon": "resources/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sebooth"
     },
     "mac": {
       "target": [

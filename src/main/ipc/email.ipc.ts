@@ -2,10 +2,8 @@ import { IpcMain, app } from 'electron'
 import nodemailer from 'nodemailer'
 import { join } from 'path'
 import { existsSync, readdirSync } from 'fs'
-import { config } from 'dotenv'
 
-// Load environment variables
-config()
+// dotenv is loaded centrally in lib/env.ts (imported first by index.ts)
 
 const GMAIL_USER = process.env.GMAIL_USER || ''
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || ''
