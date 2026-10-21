@@ -72,7 +72,7 @@ export function PrintQuantityModal({ isOpen, onClose, onConfirm, initialQuantity
                         ×
                     </button>
 
-                    <h2 className={styles.title}>🖨️ Mau cetak berapa foto?</h2>
+                    <h2 className={styles.title}>Mau cetak berapa foto?</h2>
                     <p className={styles.subtitle}>
                         Kita pakai kelipatan 2 yaa
                     </p>

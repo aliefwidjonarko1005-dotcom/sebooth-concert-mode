@@ -1,9 +1,8 @@
 .container {
-    width: 100vw;
+    width: 100%;
     height: 100vh;
     display: flex;
-    background: var(--clay-navy);
-    /* Deep navy for camera focus */
+    background: transparent;
     overflow: hidden;
     position: relative;
 }
@@ -11,47 +10,44 @@
 /* No Frame State */
 .noFrame {
     width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
     gap: var(--spacing-lg);
-    background: var(--clay-navy);
+    background: transparent;
 }
 
 .noFrame h2 {
-    font-size: var(--font-size-2xl);
-    color: #FFFFFF;
-    font-weight: 900;
+    font-size: 72px;
 }
 
 .noFrame p {
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 20px;
+    font-weight: 600;
 }
 
 .noFrame button {
-    padding: var(--spacing-md) var(--spacing-xl);
+    padding: 14px 36px;
+    font-size: 20px;
     font-weight: 900;
-    color: #1A1A2E;
-    background: var(--clay-yellow);
-    border: none;
+    color: #FFFFFF;
+    background: var(--brand-orange);
+    border: var(--ink-line);
     border-radius: var(--radius-full);
-    box-shadow: var(--clay-shadow-yellow);
+    box-shadow: var(--sticker-shadow);
     cursor: pointer;
-    transition: all var(--transition-bouncy);
-}
-
-.noFrame button:hover {
-    transform: translateY(-4px) scale(1.03);
 }
 
 .noFrame button:active {
-    transform: scale(0.92);
-    box-shadow: var(--clay-shadow-sm);
+    transform: translateY(5px);
+    box-shadow: var(--sticker-shadow-pressed);
 }
 
-/* Capture Area */
+/* Capture Area — column flow: [top bar space] HUD → preview slot → "Tekan 3" row. Nothing overlaps. */
 .captureArea {
     flex: 1;
     display: flex;
@@ -59,76 +55,26 @@
     position: relative;
     width: 100%;
     height: 100%;
+    padding-top: calc(var(--top-chip-top) + var(--top-chip-h) + 16px);
+}
+
+/* Takes the height left under the top bar; the viewfinder sizes itself from it (cq units) */
+.viewfinderSlot {
+    flex: 1 1 0;
+    min-height: 0;
+    position: relative;
+    z-index: 1;
+    /* room for the sticker frame + hard shadow drawn outside the preview */
+    padding: 12px 26px 30px 14px;
+    container-type: size;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
 }
 
 /* Controls Bar — floating pills */
-.controlsBar {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: var(--spacing-lg) var(--spacing-2xl);
-    background: transparent;
-    z-index: 10;
-}
-
-.frameName {
-    font-size: var(--font-size-lg);
-    font-weight: 900;
-    color: #1A1A2E;
-    background: #FFFFFF;
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border-radius: var(--radius-full);
-    box-shadow: var(--clay-shadow);
-}
-
-.photoCount {
-    font-size: var(--font-size-base);
-    font-weight: 800;
-    color: #1A1A2E;
-    background: #FFFFFF;
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border-radius: var(--radius-full);
-    box-shadow: var(--clay-shadow);
-}
-
-.controlsRight {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-}
-
-.photoInfo {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: var(--spacing-xs);
-}
-
-.frameNumber {
-    font-size: var(--font-size-sm);
-    font-weight: 700;
-    color: #1A1A2E;
-    background: rgba(255, 255, 255, 0.9);
-    padding: var(--spacing-xs) var(--spacing-md);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--clay-shadow-sm);
-    border: 2px solid var(--clay-yellow);
-}
 
 /* Viewfinder */
-.viewfinderContainer {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
 
 .viewfinder {
     position: relative;
@@ -136,8 +82,14 @@
     height: 100%;
     max-width: 100%;
     max-height: 100vh;
-    background: var(--clay-navy);
+    background: var(--brand-ink);
     overflow: hidden;
+    /* sticker frame: white edge, ink outline, hard orange drop */
+    border-radius: 22px;
+    box-shadow:
+        0 0 0 6px #FFFFFF,
+        0 0 0 11px var(--brand-ink),
+        12px 14px 0 11px var(--brand-orange);
 }
 
 /* Safe area overlay used to show black bars for portrait slots */
@@ -159,29 +111,11 @@
     z-index: 6;
 }
 
-.safeAreaOverlay .centerBox {
-    position: absolute;
-    border: 2px dashed rgba(255, 255, 255, 0.25);
-    box-sizing: border-box;
-    pointer-events: none;
-}
-
 .video {
     width: 100%;
     height: 100%;
     object-fit: cover;
     transform: scaleX(-1);
-}
-
-.frameOverlay {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    pointer-events: none;
-    z-index: 5;
-    opacity: 0.9;
 }
 
 /* Countdown Overlay */
@@ -192,34 +126,30 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(26, 26, 46, 0.65);
+    background: rgba(0, 17, 58, 0.45);
     z-index: 20;
 }
 
-.countdownNumber {
-    font-size: 180px;
-    font-weight: 900;
-    color: var(--clay-yellow);
-    text-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
 .slotIndicator {
-    font-size: var(--font-size-2xl);
+    font-size: 24px;
     font-weight: 900;
-    color: #1A1A2E;
+    color: var(--brand-ink);
     background: #FFFFFF;
-    padding: var(--spacing-sm) var(--spacing-xl);
+    padding: 8px 24px;
+    border: 4px solid var(--brand-ink);
     border-radius: var(--radius-full);
-    margin-top: var(--spacing-md);
-    box-shadow: var(--clay-shadow);
+    margin-top: 8px;
 }
 
-/* Flash */
+/* Flash — white burst with the comic "Cekrek!" sticker on top */
 .flashOverlay {
     position: absolute;
     inset: 0;
     background: white;
     z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Preview */
@@ -244,338 +174,61 @@
 .previewBadge {
     position: absolute;
     bottom: 40px;
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-sm);
-    background: #FFFFFF;
-    padding: var(--spacing-md) var(--spacing-xl);
+    background: var(--brand-orange);
+    padding: 14px 32px;
     border-radius: var(--radius-full);
-    box-shadow: var(--clay-shadow);
-    color: #1A1A2E;
+    color: #FFFFFF;
+    font-size: 26px;
     font-weight: 900;
-    font-size: var(--font-size-lg);
-}
-
-.checkmark {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--clay-green);
-    color: white;
-    border-radius: 50%;
-    font-size: 16px;
 }
 
 /* Ready Button Container */
+/* "Tekan 3" sticker, overlaid on the bottom edge of the preview */
 .readyButtonContainer {
     position: absolute;
-    bottom: 40px;
     left: 0;
-    width: 100%;
+    right: 0;
+    bottom: 22px;
     display: flex;
     justify-content: center;
-    z-index: 10;
+    z-index: 15;
+    pointer-events: none;
 }
 
-/* Take Photo Button — big green pill */
 .readyButton {
-    padding: var(--spacing-lg) var(--spacing-3xl);
-    font-size: var(--font-size-2xl);
-    font-weight: 900;
-    color: #FFFFFF;
-    background: var(--clay-green);
-    border: none;
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 24px 8px 26px;
+    font-size: 22px;
+    font-weight: 800;
+    white-space: nowrap;
+    color: var(--brand-ink);
+    background: #FFFFFF;
+    border: 4px solid var(--brand-ink);
     border-radius: var(--radius-full);
-    box-shadow: var(--clay-shadow-green);
-    transition: all var(--transition-bouncy);
-    cursor: pointer;
-}
-
-.readyButton:hover {
-    transform: translateY(-6px) scale(1.04);
-    box-shadow: 0 16px 40px rgba(62, 193, 138, 0.55);
+    box-shadow: 0 6px 0 var(--brand-ink);
+    transform: rotate(-1.5deg);
 }
 
 .readyButton:active {
-    transform: scale(0.90) translateY(4px);
-    box-shadow: var(--clay-shadow-sm);
+    transform: rotate(-1.5deg) translateY(4px);
+    box-shadow: 0 2px 0 var(--brand-ink);
 }
 
 /* Floating Gallery */
-.floatingGallery {
-    position: absolute;
-    bottom: var(--spacing-xl);
-    right: var(--spacing-xl);
-    z-index: 40;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-}
-
-.galleryToggle {
-    width: 180px;
-    height: 180px;
-    border-radius: var(--radius-2xl);
-    background: #FFFFFF;
-    border: 5px solid #FFFFFF;
-    cursor: pointer;
-    overflow: hidden;
-    transition: all var(--transition-bouncy);
-    box-shadow: var(--clay-shadow);
-    position: relative;
-    z-index: 41;
-}
-
-.galleryToggle:hover {
-    transform: scale(1.06) translateY(-6px);
-    box-shadow: var(--clay-shadow-lg);
-}
-
-.galleryToggle:active {
-    transform: scale(0.93) translateY(3px);
-    box-shadow: var(--clay-shadow-sm);
-}
-
-.toggleThumbnail {
-    width: 100%;
-    height: 100%;
-    position: relative;
-}
-
-.toggleThumbnail img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.photoCountBadge {
-    position: absolute;
-    bottom: -10px;
-    right: -10px;
-    background: var(--clay-coral);
-    color: #FFFFFF;
-    font-size: 14px;
-    font-weight: 900;
-    width: 42px;
-    height: 42px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    box-shadow: var(--clay-shadow-coral);
-    z-index: 42;
-}
-
-.toggleThumbnailEmpty {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 36px;
-    color: var(--color-text-tertiary);
-    background: var(--clay-cream);
-}
-
-.toggleThumbnailEmpty span {
-    font-size: var(--font-size-sm);
-    margin-top: 8px;
-    font-weight: 800;
-    color: var(--color-text-secondary);
-}
-
-.galleryPanel {
-    position: absolute;
-    bottom: calc(100% + var(--spacing-sm));
-    right: 0;
-    width: 320px;
-    background: #FFFFFF;
-    border-radius: var(--radius-2xl);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    box-shadow: var(--clay-shadow-lg);
-    max-height: 70vh;
-}
-
-.sidebarHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: #FFFFFF;
-    border-bottom: 2px solid var(--clay-cream);
-}
-
-.sidebarHeader h3 {
-    margin: 0;
-    color: var(--color-text-main);
-    font-size: var(--font-size-lg);
-    font-weight: 900;
-}
-
-.closeGalleryBtn {
-    background: var(--clay-cream);
-    border: none;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    font-size: 18px;
-    width: 34px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all var(--transition-fast);
-    box-shadow: var(--clay-shadow-sm);
-}
-
-.closeGalleryBtn:active {
-    transform: scale(0.9);
-}
-
-.slotGridWrapper {
-    flex: 1;
-    overflow-y: auto;
-    padding: var(--spacing-md);
-}
-
-.slotGrid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-sm);
-}
-
-.slotThumbnail {
-    position: relative;
-    aspect-ratio: 4 / 3;
-    background: var(--clay-cream);
-    border-radius: var(--radius-lg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    overflow: hidden;
-    transition: all var(--transition-base);
-    box-shadow: var(--clay-shadow-sm);
-    padding: 4px;
-}
-
-.slotThumbnail:hover {
-    transform: scale(1.03);
-}
-
-.slotThumbnail.filled {
-    box-shadow: var(--clay-shadow);
-    background: #FFFFFF;
-}
-
-.slotThumbnail.active {
-    outline: 3px solid var(--clay-yellow);
-    background: rgba(247, 201, 72, 0.12);
-    box-shadow: var(--clay-shadow-yellow);
-}
-
-.slotThumbnail img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: calc(var(--radius-lg) - 4px);
-}
-
-.slotNumber {
-    font-size: var(--font-size-2xl);
-    font-weight: 900;
-    color: var(--color-text-tertiary);
-}
-
-.retakeHint {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 8px 4px;
-    font-size: var(--font-size-sm);
-    font-weight: 800;
-    text-align: center;
-    color: #FFFFFF;
-    background: var(--clay-coral);
-    border-top-left-radius: var(--radius-lg);
-    border-top-right-radius: var(--radius-lg);
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-}
-
-.slotThumbnail:hover .retakeHint {
-    opacity: 1;
-}
 
 /* Done Button */
-.doneButton {
-    margin: var(--spacing-md);
-    padding: var(--spacing-md) var(--spacing-xl);
-    font-size: var(--font-size-xl);
-    font-weight: 900;
-    color: var(--color-text-secondary);
-    background: var(--clay-cream);
-    border: none;
-    border-radius: var(--radius-full);
-    transition: all var(--transition-bouncy);
-    box-shadow: var(--clay-shadow-sm);
-    cursor: pointer;
-}
-
-.doneButton:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.doneButton.ready {
-    color: #FFFFFF;
-    background: var(--clay-green);
-    box-shadow: var(--clay-shadow-green);
-}
-
-.doneButton.ready:hover {
-    transform: translateY(-4px) scale(1.02);
-}
-
-.doneButton.ready:active {
-    transform: scale(0.93);
-    box-shadow: var(--clay-shadow-sm);
-}
 
 /* Connection Status */
-.connectionStatus {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    margin-bottom: var(--spacing-md);
-    font-size: var(--font-size-xs);
-    color: var(--color-text-tertiary);
-}
-
-.statusDot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--clay-yellow);
-}
-
-.statusDot.connected {
-    background: var(--clay-green);
-}
 
 /* Review Popup */
 .reviewPopupOverlay {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
+    right: var(--rail-w); /* stop at the button rail */
     bottom: 0;
     background: rgba(0, 0, 0, 0.8);
     display: flex;
@@ -664,10 +317,9 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--brand-ink);
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--radius-xl);
-    backdrop-filter: blur(10px);
 }
 
 .navBtn {
@@ -795,11 +447,6 @@
     text-align: center;
 }
 
-.errorIcon {
-    font-size: 64px;
-    opacity: 0.6;
-}
-
 .errorOverlay h3 {
     color: var(--clay-coral);
     font-size: var(--font-size-xl);
@@ -850,41 +497,125 @@
     flex-direction: column !important;
 }
 
-:global(body.app-portrait) .galleryToggle {
-    width: 140px !important;
-    height: 140px !important;
-}
-
-:global(body.app-portrait) .galleryPanel {
-    width: 300px !important;
-    max-height: 50vh !important;
-}
-
-:global(body.app-portrait) .countdownNumber {
-    font-size: 140px !important;
-}
-
 :global(body.app-portrait) .reviewPopup {
     width: 95% !important;
     max-width: 100% !important;
     height: 90vh !important;
 }
 
-
-:global(body.app-portrait) .floatingGallery {
-    bottom: 100px !important;
-    right: 16px !important;
+.readyKey {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand-orange);
+    border: 3px solid var(--brand-ink);
+    color: #FFFFFF;
+    font-size: 26px;
+    font-weight: 900;
+    animation: keyHop 1.6s ease-in-out infinite;
 }
 
-:global(body.app-portrait) .readyButton {
-    padding: var(--spacing-lg) var(--spacing-2xl) !important;
-    font-size: var(--font-size-xl) !important;
+@keyframes keyHop {
+    0%, 60%, 100% { transform: translateY(0); }
+    70% { transform: translateY(-8px) rotate(-8deg); }
+    85% { transform: translateY(0) scale(1.08, 0.92); }
 }
 
-:global(body.app-portrait) .readyButtonContainer {
-    bottom: 24px !important;
+@media (prefers-reduced-motion: reduce) {
+    .readyKey { animation: none; }
 }
 
-:global(body.app-portrait) .controlsBar {
-    padding: var(--spacing-md) var(--spacing-lg) !important;
+.operatorBar {
+    position: fixed;
+    top: var(--top-chip-top);
+    left: 24px;
+    z-index: 100;
+    display: flex;
+    gap: 10px;
+}
+
+/* Same height as the SessionTimer chip so the top bar reads as one row */
+.operatorBtn {
+    height: var(--top-chip-h);
+    display: inline-flex;
+    align-items: center;
+    padding: 0 20px;
+    font-size: 15px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(0, 17, 58, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-full);
+}
+
+/* ── Review popup: cartoon sticker skin (overrides the clay look above) ── */
+.reviewPopup {
+    border: 6px solid var(--brand-ink);
+    border-radius: var(--sticker-radius);
+    box-shadow: 14px 16px 0 var(--brand-orange), 14px 16px 0 6px var(--brand-ink);
+}
+
+.reviewPopupHeader,
+.reviewPopupControls {
+    background: #FFFFFF;
+    border: none;
+}
+
+.reviewPopupHeader h3 {
+    color: var(--brand-ink);
+}
+
+.reviewPopupPhoto {
+    background: var(--brand-ink);
+}
+
+.retakeBtn,
+.continueBtn,
+.retryButton {
+    border: var(--ink-line);
+    box-shadow: none;
+    transition: transform var(--transition-fast);
+}
+
+.retakeBtn {
+    background: #FFFFFF;
+    color: var(--brand-ink);
+}
+
+.continueBtn {
+    background: var(--brand-orange);
+    color: var(--brand-ink);
+    box-shadow: var(--sticker-shadow-sm);
+}
+
+.retryButton {
+    background: var(--brand-orange);
+    color: #FFFFFF;
+}
+
+.retakeBtn:hover:not(:disabled),
+.continueBtn:hover:not(:disabled) {
+    transform: none;
+}
+
+.retakeBtn:active:not(:disabled),
+.continueBtn:active:not(:disabled),
+.retryButton:active {
+    transform: translateY(3px);
+    box-shadow: var(--sticker-shadow-pressed);
+}
+
+.previewImage {
+    border: 5px solid #FFFFFF;
+    box-shadow: 0 0 0 5px var(--brand-ink);
+}
+
+/* Touch mode: progress shown in the top bar (no rail to carry it) */
+.progressChip {
+    background: var(--brand-ink);
+    color: #FFFFFF;
+    font-weight: 900;
 }

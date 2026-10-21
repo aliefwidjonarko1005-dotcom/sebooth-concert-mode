@@ -3,7 +3,8 @@
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background: var(--clay-cream);
+    background: transparent;
+    color: #FFFFFF;
     overflow: hidden;
     position: relative;
     user-select: none;
@@ -11,40 +12,26 @@
 
 .header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    padding: var(--spacing-lg) var(--spacing-xl);
-    background: transparent;
+    padding: 32px 48px 0;
     z-index: 20;
 }
 
 .header h1 {
-    font-size: var(--font-size-2xl);
-    font-weight: 900;
-    color: var(--color-text-main);
-    margin: 0;
+    font-size: 88px;
+    margin: 6px 0 0;
 }
 
+/* Operator escape hatch (mouse only); customers use the timer / buttons */
 .backButton {
-    padding: var(--spacing-xs) var(--spacing-md);
-    font-size: var(--font-size-sm);
-    font-weight: 800;
-    color: #FFFFFF;
-    background: var(--clay-coral);
-    border: none;
+    margin-top: 76px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: var(--radius-full);
-    cursor: pointer;
-    box-shadow: var(--clay-shadow-coral);
-    transition: all var(--transition-bouncy);
-}
-
-.backButton:hover {
-    transform: translateY(-4px) scale(1.03);
-}
-
-.backButton:active {
-    transform: scale(0.92) translateY(2px);
-    box-shadow: var(--clay-shadow-sm);
 }
 
 .content {
@@ -55,19 +42,16 @@
     justify-content: center;
     position: relative;
     width: 100%;
-    height: 100%;
     overflow: hidden;
 }
 
-/* Horizontal Carousel Track Area */
 .carouselWrapper {
     width: 100%;
-    height: 70vh;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    perspective: 1000px;
 }
 
 .carouselTrack {
@@ -79,32 +63,31 @@
     height: 100%;
 }
 
-/* Individual Frame Card in Slider */
 .carouselCard {
     position: absolute;
-    width: 350px;
+    width: 320px;
     background: #FFFFFF;
-    border-radius: var(--radius-2xl);
-    box-shadow: var(--clay-shadow-lg);
-    padding: var(--spacing-md);
+    border: var(--ink-line);
+    border-radius: var(--sticker-radius);
+    padding: 14px;
     cursor: pointer;
     transform-origin: center center;
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 
 .focusedCard {
-    box-shadow: 0 20px 40px rgba(59, 130, 246, 0.4), 0 0 0 4px #3b82f6;
+    box-shadow: 0 0 0 6px var(--brand-orange), 0 0 0 10px var(--brand-ink), 0 14px 0 10px var(--brand-ink);
     z-index: 10 !important;
 }
 
 .framePreview {
     position: relative;
     width: 100%;
-    background: var(--clay-cream);
-    border-radius: var(--radius-xl);
+    background: var(--brand-light);
+    border: 3px solid var(--brand-ink);
+    border-radius: 14px;
     overflow: hidden;
 }
 
@@ -125,123 +108,75 @@
     justify-content: center;
     transform-origin: center center;
     z-index: 5;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
 }
 
 .slotNumber {
-    color: white;
-    font-size: var(--font-size-2xl);
+    color: #FFFFFF;
+    font-size: 26px;
     font-weight: 900;
-    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .frameInfo {
-    padding: var(--spacing-md) var(--spacing-sm) 0 var(--spacing-sm);
+    padding: 12px 8px 2px;
     text-align: center;
 }
 
 .frameInfo h3 {
-    font-size: var(--font-size-lg);
+    font-size: 20px;
     font-weight: 900;
-    color: var(--color-text-main);
-    margin: 0 0 4px 0;
+    color: var(--brand-ink);
+    margin: 0 0 2px;
 }
 
 .frameInfo span {
-    font-size: var(--font-size-sm);
+    font-size: 14px;
     color: var(--color-text-secondary);
     font-weight: 700;
 }
 
-/* Nav Control Side Buttons */
-.navArrowLeft,
-.navArrowRight {
+/* Big frame number — matches the printed samples shown in the queue */
+.frameNumberBadge {
     position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
-    border: 3px solid #3b82f6;
-    color: #1e293b;
-    font-size: 24px;
-    font-weight: 900;
-    cursor: pointer;
+    top: -26px;
+    left: -26px;
     z-index: 30;
+    min-width: 68px;
+    height: 68px;
+    padding: 0 14px;
+    border-radius: 34px;
+    background: var(--brand-orange);
+    color: #FFFFFF;
+    font-size: 40px;
+    font-weight: 900;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-    transition: all 0.2s ease;
+    border: var(--ink-line);
 }
 
-.navArrowLeft {
-    left: 40px;
-}
-
-.navArrowRight {
-    right: 40px;
-}
-
-.navArrowLeft:hover,
-.navArrowRight:hover {
-    background: #3b82f6;
-    color: #ffffff;
-    transform: translateY(-50%) scale(1.1);
-}
-
-.navArrowLeft:active,
-.navArrowRight:active {
-    transform: translateY(-50%) scale(0.95);
-}
-
-/* Bottom Action Bar */
-.bottomActionBar {
-    margin-bottom: var(--spacing-xl);
-    z-index: 20;
+.dots {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
+    justify-content: center;
+    gap: 10px;
+    padding: 0 0 32px;
 }
 
-.selectButton {
-    padding: 16px 48px;
-    font-size: 20px;
-    font-weight: 900;
-    color: #ffffff;
-    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-    border: none;
-    border-radius: var(--radius-full);
-    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.5);
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.dot,
+.dotActive {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    border: 3px solid var(--brand-ink);
 }
 
-.selectButton:hover {
-    transform: translateY(-4px) scale(1.05);
-    box-shadow: 0 15px 35px rgba(59, 130, 246, 0.6);
+.dotActive {
+    width: 44px;
+    border-radius: 8px;
+    background: var(--brand-orange);
 }
 
-.selectButton:active {
-    transform: scale(0.95);
-}
-
-.instructionsHint {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--color-text-secondary);
-    background: rgba(255, 255, 255, 0.8);
-    padding: 6px 16px;
-    border-radius: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-/* Empty State */
 .emptyState {
     display: flex;
     flex-direction: column;
@@ -249,46 +184,95 @@
     justify-content: center;
     height: 100%;
     text-align: center;
-    gap: var(--spacing-md);
-}
-
-.emptyIcon {
-    font-size: 80px;
-    margin-bottom: var(--spacing-md);
+    gap: 12px;
 }
 
 .emptyState h2 {
-    font-size: var(--font-size-2xl);
-    color: var(--color-text-main);
-    font-weight: 900;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 64px;
+    color: #FFFFFF;
 }
 
 .emptyState p {
-    color: var(--color-text-secondary);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 20px;
 }
 
 .adminButton {
-    margin-top: var(--spacing-lg);
-    padding: var(--spacing-md) var(--spacing-xl);
-    font-weight: 900;
-    color: #1A1A2E;
-    background: var(--clay-yellow);
-    border: none;
+    margin-top: 16px;
+    padding: 14px 28px;
+    font-weight: 800;
+    color: var(--brand-ink);
+    background: #FFFFFF;
+    border: var(--ink-line);
     border-radius: var(--radius-full);
-    box-shadow: var(--clay-shadow-yellow);
-    cursor: pointer;
-    transition: all var(--transition-bouncy);
 }
 
-/* PORTRAIT MODE SPECIFICS */
 :global(body.app-portrait) .carouselCard {
-    width: 300px;
+    width: 400px;
 }
 
-:global(body.app-portrait) .navArrowLeft {
-    left: 16px;
+:global(body.app-portrait) .header {
+    padding: 40px 32px 0;
 }
 
-:global(body.app-portrait) .navArrowRight {
-    right: 16px;
+:global(body.app-portrait) .header h1 {
+    font-size: 84px;
+    line-height: 0.9;
+}
+
+:global(body.app-portrait) .backButton {
+    margin-top: 88px;
+}
+
+:global(body.app-portrait) .dots {
+    padding-bottom: 56px;
+}
+
+/* ══ LANDSCAPE (touch booth) ONLY ══ Portrait must never be affected by rules below. */
+/* Card width is set from the measured stage in FrameSelection.tsx (touch branch) */
+:global(body.app-landscape) .dots {
+    padding: 28px 0 10px;
+}
+
+:global(body.app-landscape) .carouselTrack {
+    cursor: grab;
+}
+
+/* Double-tap guide under the dots */
+.touchGuide {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 4px 0 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+.doubleTap {
+    width: 44px;
+    height: 44px;
+    overflow: visible;
+}
+
+.tapRing {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: tapRing 1.4s ease-out infinite;
+}
+
+.tapRingLate {
+    animation-delay: 0.22s;
+}
+
+@keyframes tapRing {
+    0% { transform: scale(0.7); opacity: 1; }
+    70%, 100% { transform: scale(2.2); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tapRing { animation: none; }
 }

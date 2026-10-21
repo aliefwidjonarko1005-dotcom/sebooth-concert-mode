@@ -7,8 +7,28 @@ import sharp from 'sharp'
 import ffmpeg from 'fluent-ffmpeg'
 import { getFFmpegPath } from '../lib/paths'
 import { getLocalIpAddress } from '../server'
+import { enqueueSessionUpload, isCloudUploadReady } from './cloud.ipc'
 
 ffmpeg.setFfmpegPath(getFFmpegPath())
+
+export interface SaveSessionParams {
+    sessionId: string
+    stripDataUrl?: string
+    gifDataUrl?: string
+    qrCodeDataUrl?: string
+    photos: { path: string; filename: string }[]
+    videos: { path: string; filename: string }[]
+    overlay?: { path: string; filename: string }
+    mirrorOutput?: boolean
+    cameraRotation?: 0 | 90 | 180 | 270
+    videoSource?: 'capture_card' | 'usb_liveview' | 'webcam'
+    frameConfig?: {
+        width: number
+        height: number
+        slots: { width: number; height: number; x: number; y: number; rotation?: number }[]
+        qrSlots?: { width: number; height: number; x: number; y: number }[]
+    }
+}
 
 /**
  * Register all system-related IPC handlers
@@ -126,7 +146,7 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
     })
 
     // Generate High-Quality GIF using FFmpeg
-    ipcMain.handle('system:generate-hq-gif', async (_, framesBase64: string[], delayMs: number): Promise<APIResponse<string>> => {
+    const generateHqGif = async (_: unknown, framesBase64: string[], delayMs: number): Promise<APIResponse<string>> => {
         try {
             const tempPath = join(app.getPath('userData'), 'temp', `hq_gif_${Date.now()}`)
             if (!existsSync(tempPath)) {
@@ -190,7 +210,8 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
             const err = error as Error
             return { success: false, error: err.message }
         }
-    })
+    }
+    ipcMain.handle('system:generate-hq-gif', generateHqGif)
 
     // Save data URL as file
     ipcMain.handle('system:save-data-url', async (_, dataUrl: string, filename: string): Promise<APIResponse<string>> => {
@@ -222,24 +243,8 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
     })
 
     // Save entire session locally for backup
-    ipcMain.handle('system:save-session-locally', async (_, params: {
-        sessionId: string
-        stripDataUrl?: string
-        gifDataUrl?: string
-        qrCodeDataUrl?: string
-        photos: { path: string; filename: string }[]
-        videos: { path: string; filename: string }[]
-        overlay?: { path: string; filename: string }
-        mirrorOutput?: boolean
-        cameraRotation?: 0 | 90 | 180 | 270
-        videoSource?: 'capture_card' | 'usb_liveview' | 'webcam'
-        frameConfig?: {
-            width: number
-            height: number
-            slots: { width: number; height: number; x: number; y: number; rotation?: number }[]
-            qrSlots?: { width: number; height: number; x: number; y: number }[]
-        }
-    }): Promise<APIResponse<{ path: string; filename: string; mimeType: string }[]>> => {
+    const saveSessionLocally = async (_: unknown, params: SaveSessionParams
+    ): Promise<APIResponse<{ path: string; filename: string; mimeType: string }[]>> => {
         try {
             const baseDir = join(app.getPath('documents'), 'Sebooth', 'Sessions', `Session_${params.sessionId}`)
 
@@ -634,6 +639,47 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
             const err = error as Error
             return { success: false, error: err.message }
         }
+    }
+    ipcMain.handle('system:save-session-locally', saveSessionLocally)
+
+    // Fire-and-forget: GIF + local save + cloud enqueue run in the background so the booth
+    // never waits on FFmpeg or the network. Jobs run one at a time to keep CPU free for capture.
+    let finalizeChain: Promise<void> = Promise.resolve()
+    ipcMain.handle('system:finalize-session', async (_, params: {
+        save: SaveSessionParams
+        gifFrames?: string[]
+        upload?: { eventName: string; frameName: string }
+    }): Promise<APIResponse<void>> => {
+        finalizeChain = finalizeChain.then(async () => {
+            const { save } = params
+            try {
+                let gifDataUrl = save.gifDataUrl
+                if (!gifDataUrl && params.gifFrames && params.gifFrames.length > 0) {
+                    const gif = await generateHqGif(null, params.gifFrames, 500)
+                    if (gif.success) gifDataUrl = gif.data
+                }
+                const result = await saveSessionLocally(null, { ...save, gifDataUrl })
+                if (!result.success || !result.data) {
+                    console.error(`[Finalize] Local save failed for ${save.sessionId}:`, result.error)
+                    return
+                }
+                console.log(`[Finalize] Session ${save.sessionId} saved locally (${result.data.length} files)`)
+
+                if (params.upload && isCloudUploadReady()) {
+                    const files: Parameters<typeof enqueueSessionUpload>[0]['files'] = []
+                    for (const f of result.data) {
+                        if (f.filename.startsWith('strip_')) files.push({ path: f.path, destName: 'strip.jpg', mimeType: f.mimeType, type: 'photo', isStrip: true })
+                        else if (f.filename.startsWith('gif_')) files.push({ path: f.path, destName: 'animation.gif', mimeType: f.mimeType, type: 'gif' })
+                        else if (f.filename.startsWith('live_video_')) files.push({ path: f.path, destName: 'live.mp4', mimeType: f.mimeType, type: 'live' })
+                        else if (/^photo_\d+\.jpg$/.test(f.filename)) files.push({ path: f.path, destName: f.filename, mimeType: f.mimeType, type: 'photo' })
+                    }
+                    enqueueSessionUpload({ sessionId: save.sessionId, ...params.upload, files })
+                }
+            } catch (e) {
+                console.error(`[Finalize] Background job failed for ${save.sessionId}:`, e)
+            }
+        })
+        return { success: true }
     })
 
     // Get local machine IP address for local offline sharing

@@ -4,6 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useSessionStore, useFrameStore, useAppConfig } from '../stores'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './ReviewSession.module.css'
+import { useEmitOnChange, emitMascot } from '../lib/mascotEvents'
+import { useElementHeight } from '../lib/useElementHeight'
+import { useButtonHints, useInputMode } from '../components/ButtonRail/ButtonRail'
+import { useSwipe } from '../lib/useSwipe'
 
 type FilterType = 'none' | 'grayscale' | 'sepia' | 'warm' | 'cool' | 'vintage'
 
@@ -42,6 +46,7 @@ const ReviewSession: React.FC = () => {
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
     const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const carouselRef = useRef<HTMLDivElement>(null)
+    const workspaceHeight = useElementHeight(carouselRef)
 
     // Redirect to capture if session is missing
     useEffect(() => {
@@ -79,6 +84,11 @@ const ReviewSession: React.FC = () => {
         }
     }, [selectedFilter])
 
+    const handlePrevFilter = useCallback(() => {
+        const prevIndex = (safeActiveIndex - 1 + FILTERS.length) % FILTERS.length
+        setSessionFilter(FILTERS[prevIndex].id)
+    }, [safeActiveIndex, setSessionFilter])
+
     const handleNextFilter = useCallback(() => {
         const nextIndex = (safeActiveIndex + 1) % FILTERS.length
         setSessionFilter(FILTERS[nextIndex].id)
@@ -91,6 +101,18 @@ const ReviewSession: React.FC = () => {
     const handleNextStep = useCallback(() => {
         navigate('/output')
     }, [navigate])
+
+    // Touch booth: filters are browsed by swiping the carousel; the bar keeps only Mirror and Next
+    const touch = useInputMode() === 'touch'
+    const swipe = useSwipe(handlePrevFilter, handleNextFilter, touch)
+    useEmitOnChange(currentFilterDef.id, () => emitMascot('filter', { name: currentFilterDef.name }))
+    useEmitOnChange(isMirrored, () => emitMascot('mirror', { on: isMirrored ? 'on' : 'off' }))
+
+    useButtonHints({
+        1: { label: 'Filter berikutnya', onScreen: true },
+        2: { label: 'Ganti mirror', onScreen: true },
+        3: { label: 'Lanjut', primary: true, onScreen: true }
+    })
 
     // Keyboard navigation according to exact specifications:
     // Key 1: Next filter
@@ -122,7 +144,9 @@ const ReviewSession: React.FC = () => {
 
     // Calculate card dimensions for rendering (Enlarged frame size)
     const isPortrait = config.appOrientation === 'portrait'
-    const targetCardHeight = isPortrait ? 520 : 600
+    // Landscape (touch booth) screens vary (1080p at 100-150% scaling): fit the enlarged centre card
+    // (scale 1.2) inside the measured workspace. Portrait keeps its fixed, tested size.
+    const targetCardHeight = isPortrait ? 520 : Math.min(600, workspaceHeight > 0 ? (workspaceHeight - 80) / 1.2 : 600)
     const cardScaleFactor = targetCardHeight / sessionFrame.canvasHeight
     const scaledWidth = sessionFrame.canvasWidth * cardScaleFactor
     const scaledHeight = sessionFrame.canvasHeight * cardScaleFactor
@@ -145,18 +169,18 @@ const ReviewSession: React.FC = () => {
                 title="Back to Home"
                 className={styles.backButton}
             >
-                ← Kembali
+                Kembali
             </motion.button>
 
             {/* Header Title */}
             <div className={styles.header}>
-                <h2>🎨 Pilih Filter Foto</h2>
-                <p>Gunakan Filter Terbaik untuk Sesi Foto Anda</p>
+                <h2>Pilih Filter Foto</h2>
+                <p>{touch ? `Filter ${currentFilterDef.name}. Geser kartu untuk mencoba yang lain.` : 'Gunakan Filter Terbaik untuk Sesi Foto Anda'}</p>
             </div>
 
             {/* Main 3D Infinite Circular Sliding Carousel Area */}
             <div className={styles.carouselWorkspace} ref={carouselRef}>
-                <div className={styles.carouselCenterTrack}>
+                <motion.div className={styles.carouselCenterTrack} {...swipe}>
                     {FILTERS.map((filter, idx) => {
                         const offset = getCircularOffset(idx, safeActiveIndex, FILTERS.length)
                         const isCenter = offset === 0
@@ -197,11 +221,13 @@ const ReviewSession: React.FC = () => {
                                     damping: 26,
                                     mass: 0.8
                                 }}
-                                onClick={() => {
+                                onClick={touch ? undefined : () => {
                                     if (!isCenter) {
                                         setSessionFilter(filter.id)
                                     }
                                 }}
+                                // onTap is not fired after a pan, so ending a swipe on a side card is not a tap
+                                onTap={touch ? () => { if (!isCenter) setSessionFilter(filter.id) } : undefined}
                             >
                                 {/* Inner Canvas Container representing the completed photo strip */}
                                 <div
@@ -278,13 +304,13 @@ const ReviewSession: React.FC = () => {
                             </motion.div>
                         )
                     })}
-                </div>
+                </motion.div>
             </div>
 
             {/* Bottom Floating Control Bar with Dedicated 1, 2, 3 Actions */}
             <div className={styles.bottomActionBar}>
-                {/* Button 1: Next Filter */}
-                <button 
+                {/* Button 1: Next Filter (button booth only; touch swipes the carousel) */}
+                {!touch && <button 
                     className={`${styles.actionBtn} ${styles.btnFilter}`}
                     onClick={handleNextFilter}
                     title="Tekan 1 untuk melihat filter selanjutnya"
@@ -292,9 +318,9 @@ const ReviewSession: React.FC = () => {
                     <span className={styles.btnNumber}>1</span>
                     <div className={styles.btnLabelGroup}>
                         <span className={styles.btnLabel}>Filter Selanjutnya</span>
-                        <span className={styles.btnSublabel}>{currentFilterDef.name} ➔</span>
+                        <span className={styles.btnSublabel}>{currentFilterDef.name} </span>
                     </div>
-                </button>
+                </button>}
 
                 {/* Button 2: Toggle Mirror Output */}
                 <button 
@@ -305,7 +331,7 @@ const ReviewSession: React.FC = () => {
                     <span className={styles.btnNumber}>2</span>
                     <div className={styles.btnLabelGroup}>
                         <span className={styles.btnLabel}>Mirror Output</span>
-                        <span className={styles.btnSublabel}>{isMirrored ? '🪞 Aktif (ON)' : '📷 Normal (OFF)'}</span>
+                        <span className={styles.btnSublabel}>{isMirrored ? 'Aktif (ON)' : 'Normal (OFF)'}</span>
                     </div>
                 </button>
 
@@ -318,7 +344,7 @@ const ReviewSession: React.FC = () => {
                     <span className={styles.btnNumber}>3</span>
                     <div className={styles.btnLabelGroup}>
                         <span className={styles.btnLabel}>Lanjutkan</span>
-                        <span className={styles.btnSublabel}>Ke Output ➔</span>
+                        <span className={styles.btnSublabel}>Ke Output </span>
                     </div>
                 </button>
             </div>

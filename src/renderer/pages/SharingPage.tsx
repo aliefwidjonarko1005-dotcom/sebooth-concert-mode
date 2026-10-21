@@ -6,6 +6,7 @@ import { useSessionStore, useAppConfig, useQueueStore } from '../stores'
 import { PrintQuantityModal } from '../components/PrintQuantityModal'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './SharingPage.module.css'
+import { useButtonHints } from '../components/ButtonRail/ButtonRail'
 
 function SharingPage(): JSX.Element {
     const navigate = useNavigate()
@@ -141,21 +142,23 @@ function SharingPage(): JSX.Element {
         }
     }
 
+    useButtonHints({
+        2: { label: 'Selesai' },
+        3: { label: 'Cetak foto', primary: true }
+    })
+
     // Keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
             if (isPrintModalOpen || isConfirmModalOpen) return
 
-            if (e.key === '1') {
-                e.preventDefault()
-                handlePrint()
-            } else if (e.key === '2') {
+            if (e.key === '2') {
                 e.preventDefault()
                 handleHome()
             } else if (e.key === '3') {
                 e.preventDefault()
-                // Button 3 is disabled on Sharing page
+                handlePrint()
             }
         }
         window.addEventListener('keydown', handleKeyDown)
@@ -167,9 +170,9 @@ function SharingPage(): JSX.Element {
             <motion.h1 
                 initial={{ y: -50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                className={styles.title}
+                className={`kiosk-title ${styles.title}`}
             >
-                Share Your Memories
+                Ambil fotomu
             </motion.h1>
             
             <motion.p 
@@ -178,7 +181,7 @@ function SharingPage(): JSX.Element {
                 transition={{ delay: 0.1 }}
                 className={styles.subtitle}
             >
-                Scan the QR code below using your phone camera to download your photos, GIF, and Live Video.
+                Pindai QR ini pakai kamera HP untuk mengunduh foto, GIF, dan video live.
             </motion.p>
 
             <motion.div 
@@ -190,18 +193,18 @@ function SharingPage(): JSX.Element {
                 {isGenerating ? (
                     <div className={styles.loadingQr}>
                         <div className={styles.spinner}></div>
-                        <p>Generating QR Code...</p>
+                        <p>Menyiapkan QR...</p>
                     </div>
                 ) : error ? (
                     <div className={styles.loadingQr}>
-                        <p style={{ color: 'red' }}>{error}</p>
+                        <p className={styles.errorText}>{error}</p>
                     </div>
                 ) : qrUrl ? (
                     <>
                         <div className={styles.qrCode}>
                             <QRCode value={qrUrl} size={460} level="H" />
                         </div>
-                        <p className={styles.scanText}>📷 Aim your camera here</p>
+                        <p className={styles.scanText}>Arahkan kamera HP ke sini</p>
                     </>
                 ) : null}
             </motion.div>

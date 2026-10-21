@@ -6,6 +6,7 @@ import { useFrameStore, useAppConfig, useSessionStore } from '../stores'
 import { SessionTimer } from '../components/SessionTimer'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './PaymentGateway.module.css'
+import { useButtonHints } from '../components/ButtonRail/ButtonRail'
 
 interface PaymentState {
     status: 'idle' | 'pending' | 'success' | 'failed' | 'expired'
@@ -293,15 +294,15 @@ function PaymentGateway(): JSX.Element {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
-            if (e.key === '3') {
+            if (e.key === '1') {
                 e.preventDefault()
                 if (additionalPrints > 0) {
                     handlePrintChange(-2)
                 }
-            } else if (e.key === '1') {
+            } else if (e.key === '2') {
                 e.preventDefault()
                 handlePrintChange(2)
-            } else if (e.key === '2') {
+            } else if (e.key === '3') {
                 e.preventDefault()
                 if (payment.status === 'idle') {
                     createOrder()
@@ -314,13 +315,24 @@ function PaymentGateway(): JSX.Element {
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [additionalPrints, payment.status, createOrder])
 
+    // Rail labels for the physical buttons (the handler above already maps 1/2/3); touch has its own buttons
+    useButtonHints(
+        payment.status === 'idle' ? {
+            1: additionalPrints > 0 ? { label: 'Kurangi cetak', onScreen: true } : null,
+            2: { label: 'Tambah cetak', onScreen: true },
+            3: { label: 'Bayar', primary: true, onScreen: true }
+        } : payment.status === 'expired' || payment.status === 'failed' ? {
+            3: { label: 'Coba lagi', primary: true, onScreen: true }
+        } : {}
+    )
+
 
     if (!activeFrame) {
         return (
             <div className={styles.container}>
                 <div className={styles.noFrame}>
-                    <h2>No Frame Selected</h2>
-                    <button onClick={() => navigate('/frames')}>Select Frame</button>
+                    <h2 className="kiosk-title">Belum pilih frame</h2>
+                    <button onClick={() => navigate('/frames')}>Pilih frame</button>
                 </div>
             </div>
         )
@@ -337,31 +349,31 @@ function PaymentGateway(): JSX.Element {
                 duration={config.paymentTimeout}
                 onTimeout={handleTimeout}
                 enabled={config.sessionTimerEnabled}
-                label="Payment"
+                label="Bayar"
             />
 
             <div className={styles.content}>
                 <header className={styles.header}>
                     <button onClick={handleBack} className={styles.backBtn}>
-                        ← Back
+                        Kembali
                     </button>
-                    <h1>Payment</h1>
+                    <h1>Pembayaran</h1>
                 </header>
 
                 <div className={`${styles.mainContent} ${payment.status === 'idle' && !isCreatingOrder ? styles.idleState : ''} ${payment.status === 'pending' || isCreatingOrder ? styles.qrActive : ''}`}>
                     {/* Left - Price Summary */}
                     <div className={`${styles.priceSection} ${payment.status === 'pending' || isCreatingOrder ? styles.hiddenOnQr : ''}`}>
                         <div className={styles.orderSummaryHeader}>
-                            <h2>Order Summary</h2>
+                            <h2>Ringkasan pesanan</h2>
                             <div className={styles.priceItem}>
-                                <span>Session (1x 4R print)</span>
+                                <span>Sesi foto (1 cetak 4R)</span>
                                 <span>Rp {config.sessionPrice.toLocaleString('id-ID')}</span>
                             </div>
                         </div>
 
                         <div className={styles.additionalPrintSection}>
                             <div className={styles.printSelector}>
-                                <span className={styles.printSelectorTitle}>Additional Prints (per 2)</span>
+                                <span className={styles.printSelectorTitle}>Cetak tambahan (per 2 lembar)</span>
                                 <div className={styles.quantityControls}>
                                     <button
                                         onClick={() => handlePrintChange(-2)}
@@ -376,7 +388,7 @@ function PaymentGateway(): JSX.Element {
 
                             {additionalPrints > 0 && (
                                 <div className={styles.priceItem}>
-                                    <span>Extra prints ({additionalPrints}x)</span>
+                                    <span>Cetak tambahan ({additionalPrints}x)</span>
                                     <span>Rp {(additionalPrints * config.additionalPrintPrice).toLocaleString('id-ID')}</span>
                                 </div>
                             )}
@@ -396,7 +408,7 @@ function PaymentGateway(): JSX.Element {
                                     onClick={createOrder}
                                     disabled={isCreatingOrder}
                                 >
-                                    {isCreatingOrder ? 'Generating QRIS...' : 'Bayar Sekarang'}
+                                    {isCreatingOrder ? 'Menyiapkan QRIS...' : 'Bayar Sekarang'}
                                 </button>
                             )}
                         </div>
@@ -418,7 +430,7 @@ function PaymentGateway(): JSX.Element {
                                 <div className={styles.qrDisplay}>
                                     {/* Countdown Timer Badge */}
                                     <div className={styles.timerBadge}>
-                                        <span className={styles.timerIcon}>⏰</span>
+                                        <span className={styles.timerIcon}></span>
                                         <div className={styles.timerInfo}>
                                             <span className={styles.timerLabel}>Sisa Waktu Pembayaran</span>
                                             <span className={styles.timerValue}>{formatTimeLeft(paymentTimeLeft)}</span>
@@ -445,7 +457,7 @@ function PaymentGateway(): JSX.Element {
 
                             {payment.status === 'success' && (
                                 <div className={styles.successDisplay}>
-                                    <span className={styles.successIcon}>✓</span>
+                                    <span className={styles.successIcon}></span>
                                     <h3>Pembayaran Berhasil!</h3>
                                     <p>Mengalihkan ke sesi foto...</p>
                                 </div>
@@ -453,7 +465,7 @@ function PaymentGateway(): JSX.Element {
 
                             {payment.status === 'expired' && (
                                 <div className={styles.errorDisplay}>
-                                    <span>⏰</span>
+                                    <span></span>
                                     <h3>Waktu Pembayaran Habis</h3>
                                     <button onClick={() => setPayment({ status: 'idle', orderId: null, qrisUrl: null, qrString: null, transactionId: null, expiredDatetime: null })}>
                                         Coba Lagi

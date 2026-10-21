@@ -1,6 +1,9 @@
 .overlay {
     position: fixed;
-    inset: 0;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: var(--rail-w); /* stop at the button rail */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -189,4 +192,39 @@
     100% {
         transform: scale(1);
     }
+}
+
+/* ── Cartoon sticker skin (overrides the generic look above) ── */
+.modal {
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    border: 5px solid var(--brand-ink);
+    border-radius: var(--sticker-radius);
+    box-shadow: 12px 14px 0 var(--brand-orange), 12px 14px 0 5px var(--brand-ink);
+}
+
+.inputGroup input {
+    background: var(--brand-light);
+    border: 3px solid var(--brand-ink);
+    color: var(--brand-ink);
+}
+
+.inputGroup input:focus {
+    border-color: var(--brand-royal);
+    box-shadow: none;
+}
+
+.error {
+    background: var(--brand-orange);
+    border: 3px solid var(--brand-ink);
+    color: #FFFFFF;
+}
+
+.sendBtn,
+.sendBtn:hover:not(:disabled) {
+    background: var(--brand-orange);
+    border: var(--ink-line);
+    border-radius: var(--radius-full);
+    box-shadow: var(--sticker-shadow-sm);
+    font-weight: 900;
 }

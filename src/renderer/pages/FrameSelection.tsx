@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useFrameStore, useAppConfig, useSessionStore } from '../stores'
 import { SessionTimer } from '../components/SessionTimer'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './FrameSelection.module.css'
+import { emitMascot } from '../lib/mascotEvents'
+import { useButtonHints, useInputMode } from '../components/ButtonRail/ButtonRail'
+import { useSwipe } from '../lib/useSwipe'
+import { useElementSize } from '../lib/useElementHeight'
 
 function FrameSelection(): JSX.Element {
     const navigate = useNavigate()
@@ -33,7 +37,7 @@ function FrameSelection(): JSX.Element {
 
     const handleSelectFrame = (frameId: string): void => {
         setActiveFrame(frameId)
-        if (config.paymentEnabled) {
+        if (config.paymentEnabled && !config.concertMode) {
             navigate('/payment')
         } else {
             navigate('/capture')
@@ -63,7 +67,7 @@ function FrameSelection(): JSX.Element {
         navigate('/')
     }
 
-    // Keyboard & Physical Arcade Button Navigation (1: Prev, 3: Next, 2: Select)
+    // Physical buttons: 1 = previous frame, 2 = next frame, 3 = select (3 is always "go forward")
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -72,10 +76,10 @@ function FrameSelection(): JSX.Element {
             if (e.key === '1' || e.key === 'ArrowLeft') {
                 e.preventDefault()
                 handlePrev()
-            } else if (e.key === '3' || e.key === 'ArrowRight') {
+            } else if (e.key === '2' || e.key === 'ArrowRight') {
                 e.preventDefault()
                 handleNext()
-            } else if (e.key === '2' || e.key === 'Enter' || e.key === ' ') {
+            } else if (e.key === '3' || e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault()
                 const selected = displayFrames[focusedIndex]
                 if (selected) {
@@ -87,8 +91,30 @@ function FrameSelection(): JSX.Element {
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [displayFrames, focusedIndex])
 
+    const many = displayFrames.length > 1
+    const touch = useInputMode() === 'touch'
+    const contentRef = useRef<HTMLElement>(null)
+    const contentSize = useElementSize(contentRef)
+    const swipe = useSwipe(handlePrev, handleNext, touch && many)
+    useButtonHints(displayFrames.length === 0 ? {} : {
+        1: many ? { label: 'Frame sebelumnya', onScreen: true } : null,
+        2: many ? { label: 'Frame berikutnya', onScreen: true } : null,
+        3: { label: 'Pilih frame ini', primary: true, onScreen: touch }
+    })
+
     const isPortrait = config.appOrientation === 'portrait'
-    const cardSpacing = isPortrait ? 420 : 540
+
+    // Touch booth (landscape): size the card from the measured stage so the focused one always fits,
+    // swipe to browse, tap the centre card to pick. Portrait keeps its fixed, tested layout.
+    const FOCUS_SCALE_TOUCH = 1.12
+    const sample = displayFrames[focusedIndex] || displayFrames[0]
+    let touchCardWidth = 300
+    if (touch && sample && contentSize.height > 0) {
+        const maxCardH = (contentSize.height - 56) / FOCUS_SCALE_TOUCH
+        const previewH = maxCardH - 28 - 84 // card padding + name/count block
+        touchCardWidth = Math.max(160, Math.min(380, previewH * (sample.canvasWidth / sample.canvasHeight) + 28))
+    }
+    const cardSpacing = isPortrait ? 500 : touch ? touchCardWidth * 1.3 : 540
 
     return (
         <motion.div
@@ -102,21 +128,30 @@ function FrameSelection(): JSX.Element {
                 duration={config.frameSelectionTimeout}
                 onTimeout={handleTimeout}
                 enabled={config.sessionTimerEnabled}
-                label="Frame Selection"
+                label="Pilih frame"
             />
 
             <header className={styles.header}>
-                <button onClick={handleBack} className={styles.backButton}>
-                    ← Back
-                </button>
-                <h1>PILIH FRAME FOTO</h1>
-                <div style={{ width: '80px' }} />
+                <div>
+                    <h1 className="kiosk-title">Pilih <em>frame</em> kamu</h1>
+                </div>
+                <button onClick={handleBack} className={styles.backButton}>Batal</button>
             </header>
 
-            <main className={styles.content}>
+            {/* Touch booth: how to browse/pick, right above the cards */}
+            {touch && displayFrames.length > 0 && (
+                <p className={styles.touchGuide}>
+                    <svg viewBox="0 0 48 48" className={styles.doubleTap} aria-hidden="true">
+                        <circle className={styles.tapRing} cx="24" cy="24" r="10" fill="none" stroke="#ffffff" strokeWidth="4" />
+                        <circle cx="24" cy="24" r="7" fill="#ffffff" stroke="#00113a" strokeWidth="3" />
+                    </svg>
+                    {many ? 'Geser untuk lihat frame lain, ketuk frame untuk memilih' : 'Ketuk frame untuk memilih'}
+                </p>
+            )}
+
+            <main className={styles.content} ref={contentRef}>
                 {displayFrames.length === 0 ? (
                     <div className={styles.emptyState}>
-                        <span className={styles.emptyIcon}>🖼️</span>
                         <h2>Belum Ada Frame</h2>
                         <p>Silakan tambahkan frame di Admin Dashboard terlebih dahulu.</p>
                         <button onClick={() => navigate('/admin')} className={styles.adminButton}>
@@ -125,26 +160,14 @@ function FrameSelection(): JSX.Element {
                     </div>
                 ) : (
                     <div className={styles.carouselWrapper}>
-                        {/* Side Arrow Navigation Buttons */}
-                        {displayFrames.length > 1 && (
-                            <>
-                                <button className={styles.navArrowLeft} onClick={handlePrev} title="Frame Sebelumnya (Tombol 1)">
-                                    ◀
-                                </button>
-                                <button className={styles.navArrowRight} onClick={handleNext} title="Frame Selanjutnya (Tombol 3)">
-                                    ▶
-                                </button>
-                            </>
-                        )}
-
                         {/* Horizontal Carousel Track */}
-                        <div className={styles.carouselTrack}>
+                        <motion.div className={styles.carouselTrack} {...swipe}>
                             {displayFrames.map((frame, index) => {
                                 const offset = index - focusedIndex
                                 const isFocused = index === focusedIndex
 
                                 // Calculate scale, opacity, x position based on distance from center
-                                const scale = isFocused ? 1.38 : Math.max(0.60, 0.78 - Math.abs(offset) * 0.2)
+                                const scale = isFocused ? (touch ? FOCUS_SCALE_TOUCH : 1.38) : Math.max(0.60, 0.78 - Math.abs(offset) * 0.2)
                                 const opacity = isFocused ? 1 : Math.max(0, 0.65 - (Math.abs(offset) - 1) * 0.3)
                                 const zIndex = isFocused ? 20 : 10 - Math.abs(offset)
                                 const translateX = offset * cardSpacing
@@ -156,13 +179,22 @@ function FrameSelection(): JSX.Element {
                                     <motion.div
                                         key={frame.id}
                                         className={`${styles.carouselCard} ${isFocused ? styles.focusedCard : ''}`}
-                                        onClick={() => {
+                                        style={touch ? { width: touchCardWidth } : undefined}
+                                        onClick={touch ? undefined : () => {
                                             if (isFocused) {
                                                 handleSelectFrame(frame.id)
                                             } else {
                                                 setFocusedIndex(index)
                                             }
                                         }}
+                                        // onTap is not fired after a pan, so a swipe never selects
+                                        onTap={touch ? () => {
+                                            if (isFocused) handleSelectFrame(frame.id)
+                                            else {
+                                                setFocusedIndex(index)
+                                                emitMascot('focus')
+                                            }
+                                        } : undefined}
                                         animate={{
                                             x: translateX,
                                             scale,
@@ -175,13 +207,15 @@ function FrameSelection(): JSX.Element {
                                             damping: 26
                                         }}
                                     >
+                                        {/* Number matches the printed frame samples shown in the queue */}
+                                        <div className={styles.frameNumberBadge}>{index + 1}</div>
                                         <div
                                             className={styles.framePreview}
                                             style={{ aspectRatio: `${frame.canvasWidth} / ${frame.canvasHeight}` }}
                                         >
                                             {/* Colored slot indicators */}
                                             {frame.slots.map((slot) => {
-                                                const slotColors = ['#ef4444', '#3b82f6', '#22c55e', '#f97316', '#eab308', '#a855f7', '#ec4899', '#14b8a6']
+                                                const slotColors = ['#ff4500', '#1d43c4', '#00113a', '#fe6b00', '#1f9d68', '#f5a400']
                                                 const nonDuplicateSlots = frame.slots.filter(s => !s.duplicateOfSlotId)
                                                 let displayNumber: number
                                                 let colorIndex: number
@@ -222,31 +256,25 @@ function FrameSelection(): JSX.Element {
                                         </div>
                                         <div className={styles.frameInfo}>
                                             <h3>{frame.name}</h3>
-                                            <span>{frame.slots.filter(s => !s.duplicateOfSlotId).length} photo{frame.slots.filter(s => !s.duplicateOfSlotId).length !== 1 ? 's' : ''}</span>
+                                            <span>{frame.slots.filter(s => !s.duplicateOfSlotId).length} foto</span>
                                         </div>
                                     </motion.div>
                                 )
                             })}
-                        </div>
+                        </motion.div>
                     </div>
                 )}
             </main>
 
-            {/* Bottom Action Bar */}
-            {displayFrames.length > 0 && (
-                <div className={styles.bottomActionBar}>
-                    <button
-                        className={styles.selectButton}
-                        onClick={() => handleSelectFrame(displayFrames[focusedIndex]?.id)}
-                    >
-                        <span>PILIH FRAME INI</span>
-                        <span>➔</span>
-                    </button>
-                    <span className={styles.instructionsHint}>
-                        💡 Tekan tombol panah ◀ / ▶ atau angka 1/3 untuk geser frame, tombol 2 untuk pilih.
-                    </span>
+            {/* Position dots: where the focused frame sits in the list */}
+            {many && (
+                <div className={styles.dots} aria-hidden="true">
+                    {displayFrames.map((f, i) => (
+                        <span key={f.id} className={i === focusedIndex ? styles.dotActive : styles.dot} />
+                    ))}
                 </div>
             )}
+
 
             <ConfirmBackHomeModal
                 isOpen={isConfirmModalOpen}

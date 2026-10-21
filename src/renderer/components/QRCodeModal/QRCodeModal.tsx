@@ -53,7 +53,7 @@ export function QRCodeModal({ isOpen, onClose, photoUrl, isGenerating, wifiSsid,
                     </button>
 
                     <h2 className={styles.title}>
-                        {step === 'wifi' ? 'Step 1: Connect WiFi' : '📱 Scan QR Code'}
+                        {step === 'wifi' ? 'Step 1: Connect WiFi' : 'Scan QR Code'}
                     </h2>
                     <p className={styles.subtitle}>
                         {step === 'wifi'

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading;
@@ -169,10 +170,26 @@ namespace CanonHelper
                 {
                     HandleStopPolling();
                 }
+                else if (line.Equals("KEEPALIVE", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleKeepAlive();
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine("ERROR:Command execution failed - " + ex.Message);
+            }
+        }
+
+        // Resets the camera's auto power-off timer so an idle body never sleeps between sessions.
+        // Device Busy during live view / capture is expected and harmless; the next tick retries.
+        private static void HandleKeepAlive()
+        {
+            if (_cameraRef == IntPtr.Zero) return;
+            uint err = EdsSendCommand_Pin(_cameraRef, kEdsCameraCommand_ExtendShutDownTimer, 0);
+            if (err != 0)
+            {
+                Console.WriteLine("WARNING:KEEPALIVE err=0x" + err.ToString("X"));
             }
         }
 
@@ -254,7 +271,17 @@ namespace CanonHelper
         {
             lock (_cameraLock)
             {
-                if (_liveViewRunning) return;
+                if (_liveViewRunning)
+                {
+                    // Flag can be stale (camera dropped out of live view, e.g. after a capture or
+                    // leaving the page) -> HDMI shows "No Signal". Re-assert the camera/HDMI output
+                    // (this alone restarts EVF on Canon) and always answer, or Node waits 5 s.
+                    try { _camera.LiveViewDevice = (EosLiveViewDevice)1; }
+                    catch (Exception ex) { Console.WriteLine("WARNING:Re-assert TFT live view failed - " + ex.Message); }
+                    _liveViewTftMode = true;
+                    Console.WriteLine("STATUS:LV_STARTED_TFT");
+                    return;
+                }
 
                 int retries = 5;
                 for (int i = 1; i <= retries; i++)
@@ -383,10 +410,10 @@ namespace CanonHelper
 
                 lock (_cameraLock)
                 {
-                    // Get initial newest file on card
-                    string initialNewestName = "";
-                    ulong initialNewestSize = 0;
-                    FindNewestFile(_cameraRef, ref initialNewestName, ref initialNewestSize);
+                    // Snapshot existing files on card (by folder/name, so mixed cards
+                    // e.g. leftover IMG_9219 from another camera don't hide the new shot)
+                    var knownFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    CollectFiles(_cameraRef, "", knownFiles, null);
 
                     // 2. Trigger shutter
                     try
@@ -399,7 +426,6 @@ namespace CanonHelper
                     }
 
                     // 3. Poll for new photo on camera memory card
-                    string currentNewestName = initialNewestName;
                     ulong currentNewestSize = 0;
                     IntPtr currentNewestRef = IntPtr.Zero;
                     bool found = false;
@@ -409,20 +435,22 @@ namespace CanonHelper
                         EdsGetEvent_Pin();
                         Thread.Sleep(200);
 
-                        string pollName = "";
-                        ulong pollSize = 0;
-                        IntPtr pollRef = FindNewestFile(_cameraRef, ref pollName, ref pollSize);
-
-                        if (pollRef != IntPtr.Zero && pollName != "")
+                        var newFiles = new List<NewFile>();
+                        CollectFiles(_cameraRef, "", null, newFiles);
+                        NewFile pick = null;
+                        foreach (var f in newFiles)
                         {
-                            if (initialNewestName == "" || IsNewerFile(pollName, initialNewestName))
-                            {
-                                currentNewestName = pollName;
-                                currentNewestSize = pollSize;
-                                currentNewestRef = pollRef;
-                                found = true;
-                                break;
-                            }
+                            if (knownFiles.Contains(f.Key)) continue;
+                            // Prefer JPG when camera writes RAW+JPG
+                            if (pick == null || f.Name.EndsWith(".JPG", StringComparison.OrdinalIgnoreCase)) pick = f;
+                        }
+
+                        if (pick != null)
+                        {
+                            currentNewestSize = pick.Size;
+                            currentNewestRef = pick.Ref;
+                            found = true;
+                            break;
                         }
                     }
 
@@ -518,6 +546,48 @@ namespace CanonHelper
                             }
                         }
                     }
+                }
+            }
+        }
+
+        private class NewFile
+        {
+            public string Key;
+            public string Name;
+            public ulong Size;
+            public IntPtr Ref;
+        }
+
+        // Walks every volume/folder; adds "folder/name" keys to `keys` and/or full entries to `files`.
+        private static void CollectFiles(IntPtr parentRef, string path, HashSet<string> keys, List<NewFile> files)
+        {
+            int count = 0;
+            if (EdsGetChildCount_Pin(parentRef, out count) != 0) return;
+
+            for (int i = 0; i < count; i++)
+            {
+                IntPtr childRef = IntPtr.Zero;
+                if (EdsGetChildAtIndex_Pin(parentRef, i, out childRef) != 0 || childRef == IntPtr.Zero) continue;
+
+                if (path == "")
+                {
+                    // Top level children are volumes (SD slots)
+                    CollectFiles(childRef, "VOL" + i, keys, files);
+                    continue;
+                }
+
+                Edsdk.EdsDirectoryItemInfo info;
+                if (Edsdk.EdsGetDirectoryItemInfo(childRef, out info) != 0) continue;
+
+                string key = path + "/" + info.szFileName;
+                if (info.isFolder != 0)
+                {
+                    CollectFiles(childRef, key, keys, files);
+                }
+                else
+                {
+                    if (keys != null) keys.Add(key);
+                    if (files != null) files.Add(new NewFile { Key = key, Name = info.szFileName, Size = info.Size, Ref = childRef });
                 }
             }
         }
@@ -622,6 +692,11 @@ namespace CanonHelper
 
         [System.Runtime.InteropServices.DllImport("EDSDK.dll", EntryPoint = "EdsGetEvent")]
         private static extern uint EdsGetEvent_Pin();
+
+        private const uint kEdsCameraCommand_ExtendShutDownTimer = 0x00000001;
+
+        [System.Runtime.InteropServices.DllImport("EDSDK.dll", EntryPoint = "EdsSendCommand")]
+        private static extern uint EdsSendCommand_Pin(IntPtr inCameraRef, uint inCommand, int inParam);
 
         [System.Runtime.InteropServices.DllImport("EDSDK.dll", EntryPoint = "EdsDeleteDirectoryItem")]
         private static extern uint EdsDeleteDirectoryItem(IntPtr inDirItemRef);

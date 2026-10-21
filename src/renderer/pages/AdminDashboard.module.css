@@ -1,11 +1,13 @@
 .container {
     /* Scoped Dark Mode Overrides for Admin Dashboard */
-    --color-bg-primary: #111827;
-    --color-bg-secondary: #1F2937;
-    --color-bg-tertiary: #374151;
-    --color-text-primary: #F9FAFB;
-    --color-text-secondary: #9CA3AF;
-    --color-text-tertiary: #6B7280;
+    --color-bg-primary: #0A1433;
+    --color-bg-secondary: #111D45;
+    --color-bg-tertiary: #1B2A5C;
+    --color-text-primary: #F5F7FF;
+    --color-text-secondary: #A9B4D6;
+    --color-text-tertiary: #6F7CA6;
+    --color-accent: var(--brand-orange-soft);
+    --gradient-primary: var(--brand-orange);
     --color-border: rgba(255, 255, 255, 0.1);
     --color-border-hover: rgba(255, 255, 255, 0.2);
     --color-surface-hover: rgba(255, 255, 255, 0.05);
@@ -32,6 +34,20 @@
 .header h1 {
     font-size: var(--font-size-xl);
     font-weight: 600;
+}
+
+.brandTitle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800 !important;
+    letter-spacing: 0.01em;
+}
+
+.brandMark {
+    width: 40px;
+    height: 26px;
+    color: var(--brand-orange-soft);
 }
 
 .backButton {
@@ -1190,8 +1206,8 @@
 
 /* QR Slot styles */
 .qrSlot {
-    background: rgba(59, 130, 246, 0.25) !important;
-    border: 2px dashed #3b82f6 !important;
+    background: rgba(254, 107, 0, 0.25) !important;
+    border: 2px dashed #fe6b00 !important;
 }
 
 .qrSlot.selected {

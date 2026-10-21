@@ -1,0 +1,9 @@
+.agents/
+.claude/
+graphify-out/
+out/
+node_modules/
+sebooth-gallery/
+temp_gif_test/
+*.mp4
+*.jpg

@@ -149,13 +149,19 @@ export function registerCameraHandlers(ipcMain: IpcMain): void {
 
     // Switch to Canon EDSDK (Native Canon SDK — fastest, most reliable for Canon cameras)
     ipcMain.handle('camera:use-canon-edsdk', async (): Promise<APIResponse<void>> => {
-        // Shutdown existing handler if it has a shutdown method
-        if (cameraHandler && 'shutdown' in cameraHandler) {
-            await (cameraHandler as any).shutdown()
+        // Already in EDSDK mode (React StrictMode / re-render calls this twice): reuse the handler.
+        // Recreating it orphaned a still-connecting helper that kept the camera locked.
+        let handler: CanonEDSDKCamera
+        if (cameraHandler instanceof CanonEDSDKCamera) {
+            handler = cameraHandler
+        } else {
+            if (cameraHandler && 'shutdown' in cameraHandler) {
+                await (cameraHandler as any).shutdown()
+            }
+            handler = new CanonEDSDKCamera()
+            cameraHandler = handler
+            console.log('[Camera IPC] Switched to Canon EDSDK Camera (Native Canon SDK mode)')
         }
-        const handler = new CanonEDSDKCamera()
-        cameraHandler = handler
-        console.log('[Camera IPC] Switched to Canon EDSDK Camera (Native Canon SDK mode)')
 
         // Auto-connect: spawn the persistent CanonHelper.exe process immediately
         // so that live view and capture work without a separate connect step.

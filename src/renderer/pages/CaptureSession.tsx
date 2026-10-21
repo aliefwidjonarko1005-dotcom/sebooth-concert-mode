@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useFrameStore, useSessionStore, useAppConfig, useCameraStore } from '../stores'
 import { SessionTimer } from '../components/SessionTimer'
+import { useButtonHints, useRailStatus, useInputMode } from '../components/ButtonRail/ButtonRail'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
+import { CountdownBurst, SnapBurst } from '../components/CaptureArt/CaptureArt'
 import styles from './CaptureSession.module.css'
+import { useEmitOnChange, emitMascot } from '../lib/mascotEvents'
 
 type CaptureState = 'idle' | 'countdown' | 'capturing' | 'preview' | 'reviewPopup'
 
@@ -36,7 +39,9 @@ function CaptureSession(): JSX.Element {
     const navigate = useNavigate()
     const { frames, activeFrame } = useFrameStore()
     const { config, updateConfig } = useAppConfig()
-    const { photos, addPhoto, startSession, currentSession, endSession } = useSessionStore()
+    const { photos, addPhoto, startSession, currentSession, endSession, deadline, setDeadline } = useSessionStore()
+    const isConcert = !!config.concertMode
+    const [concertTimeUp, setConcertTimeUp] = useState(false)
     const { isConnected } = useCameraStore()
 
     const [captureState, setCaptureState] = useState<CaptureState>('idle')
@@ -45,13 +50,16 @@ function CaptureSession(): JSX.Element {
     const [lastCapturedImage, setLastCapturedImage] = useState<string | null>(null)
     const [isLoadingCamera, setIsLoadingCamera] = useState(true)
     const [cameraError, setCameraError] = useState<string | null>(null)
-    const [isGalleryExpanded, setIsGalleryExpanded] = useState(false)
+    // Bumped when the preview track dies (capture card re-enumerates after the DSLR shutter / HDMI drop)
+    const [streamLost, setStreamLost] = useState(0)
     const [reviewPhotoIndex, setReviewPhotoIndex] = useState(0)
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
     const [isAdjustPanelOpen, setIsAdjustPanelOpen] = useState(false)
 
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
+    const triggerCaptureRef = useRef<(slotIndex: number) => void>(() => {})
+    const cameraReadyRef = useRef(false)
     const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
     const streamRef = useRef<MediaStream | null>(null)
     const viewfinderRef = useRef<HTMLDivElement>(null)
@@ -85,6 +93,8 @@ function CaptureSession(): JSX.Element {
 
     const [safeArea, setSafeArea] = useState({ left: 0, top: 0, width: 0, height: 0 })
     const [viewfinderSize, setViewfinderSize] = useState({ width: 0, height: 0 })
+    // Native camera frame aspect (w/h); the viewfinder box uses it so the feed is shown uncropped
+    const [videoAspect, setVideoAspect] = useState<number | null>(null)
 
     const updateSafeArea = () => {
         const vf = viewfinderRef.current
@@ -111,16 +121,35 @@ function CaptureSession(): JSX.Element {
 
     useEffect(() => {
         updateSafeArea()
+        // The viewfinder resizes when the camera aspect becomes known, not only on window resize
+        const vf = viewfinderRef.current
+        const ro = vf ? new ResizeObserver(() => updateSafeArea()) : null
+        if (vf && ro) ro.observe(vf)
         window.addEventListener('resize', updateSafeArea)
-        return () => window.removeEventListener('resize', updateSafeArea)
+        return () => {
+            ro?.disconnect()
+            window.removeEventListener('resize', updateSafeArea)
+        }
     }, [slotAspectNumeric, captureSlots])
 
     // Start session on mount
     useEffect(() => {
         if (!currentSession && currentFrame) {
-            startSession(currentFrame.id)
+            startSession(currentFrame.id, isConcert ? config.concertPrintQuantity || 2 : undefined)
         }
     }, [currentSession, currentFrame, startSession])
+
+    // Concert mode: the capture+retake budget starts the first time this page opens and survives retakes
+    useEffect(() => {
+        if (isConcert && currentSession && !deadline) {
+            setDeadline(Date.now() + (config.concertSessionSeconds || 240) * 1000)
+        }
+    }, [isConcert, currentSession, deadline, setDeadline])
+
+    const concertSecondsLeft = useMemo(() => {
+        if (!deadline) return config.concertSessionSeconds || 240
+        return Math.max(1, Math.ceil((deadline - Date.now()) / 1000))
+    }, [deadline])
 
     // Initialize webcam
     const initWebcam = useCallback(async (): Promise<void> => {
@@ -189,28 +218,52 @@ function CaptureSession(): JSX.Element {
                 videoConstraints.facingMode = 'user'
             }
 
+            // Some capture cards never resolve getUserMedia when there is no HDMI signal.
+            // Time out instead of leaving "Menyiapkan kamera" up forever; release a late stream.
+            const openStream = (video: MediaTrackConstraints) => new Promise<MediaStream>((resolve, reject) => {
+                let timedOut = false
+                const timer = setTimeout(() => {
+                    timedOut = true
+                    reject(new Error('Kamera tidak mengirim gambar (timeout). Cek kamera menyala & kabel HDMI/USB.'))
+                }, 10000)
+                navigator.mediaDevices.getUserMedia({ video }).then(s => {
+                    if (timedOut) { s.getTracks().forEach(t => t.stop()); return }
+                    clearTimeout(timer)
+                    resolve(s)
+                }, e => {
+                    if (timedOut) return
+                    clearTimeout(timer)
+                    reject(e)
+                })
+            })
+
             let stream: MediaStream
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: videoConstraints
-                })
+                stream = await openStream(videoConstraints)
             } catch (innerError: any) {
-                if (resolvedCameraId && (innerError.name === 'OverconstrainedError' || innerError.name === 'NotFoundError' || innerError.name === 'DevicesNotFoundError')) {
+                const isDslrCaptureCard = config.cameraMode === 'edsdk' || config.cameraMode === 'ptp'
+                if (!isDslrCaptureCard && resolvedCameraId && (innerError.name === 'OverconstrainedError' || innerError.name === 'NotFoundError' || innerError.name === 'DevicesNotFoundError')) {
                     console.warn(`[CaptureSession] Resolved webcam ID (${resolvedCameraId}) not available/overconstrained. Error: ${innerError.name}. Falling back to default webcam...`)
                     videoConstraints = {
                         width: { ideal: 1920, min: 640 },
                         height: { ideal: 1080, min: 480 },
                         facingMode: 'user'
                     }
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: videoConstraints
-                    })
+                    stream = await openStream(videoConstraints)
                 } else {
                     throw innerError
                 }
             }
 
             streamRef.current = stream
+            stream.getVideoTracks().forEach(track => {
+                track.onended = () => {
+                    if (streamRef.current !== stream) return
+                    console.warn('[CaptureSession] Preview track ended (device dropped). Will re-init when idle.')
+                    streamRef.current = null
+                    setStreamLost(n => n + 1)
+                }
+            })
             if (videoRef.current) {
                 videoRef.current.srcObject = stream
             }
@@ -233,12 +286,11 @@ function CaptureSession(): JSX.Element {
             setCameraError(message)
             setIsLoadingCamera(false)
         }
-    }, [config.selectedCameraId])
+    }, [config.selectedCameraId, config.cameraMode])
 
-    // Initialize webcam on mount
-    useEffect(() => {
-        initWebcam()
-    }, [initWebcam])
+    // (Webcam/capture card is opened by the unified init effect below. A second mount-time
+    // initWebcam() used to race it: the later call stopped the live stream a few seconds in,
+    // which showed "Initializing camera" mid-countdown and killed the live photo recording.)
 
     // Re-initialize webcam after it was stopped for DSLR capture
     useEffect(() => {
@@ -248,7 +300,7 @@ function CaptureSession(): JSX.Element {
             return;
         }
 
-        if (captureState === 'idle' || captureState === 'countdown') {
+        if (captureState === 'idle') {
             // Only re-init if stream was previously stopped (null) and we're not already loading
             if (!streamRef.current && !isLoadingCamera) {
                 console.log('[CaptureSession] Re-initializing webcam after capture (state:', captureState, ')')
@@ -264,7 +316,7 @@ function CaptureSession(): JSX.Element {
                 }
             }
         }
-    }, [captureState, config.cameraMode, config.selectedCameraId, initWebcam, isLoadingCamera])
+    }, [captureState, config.cameraMode, config.selectedCameraId, initWebcam, isLoadingCamera, streamLost])
 
     // Cleanup on unmount
     useEffect(() => {
@@ -516,7 +568,7 @@ function CaptureSession(): JSX.Element {
                     }
                     // Capture beep (higher pitch, longer duration)
                     playBeep(1200, 300)
-                    triggerCapture(slotIndex)
+                    triggerCaptureRef.current(slotIndex)
                     return 0
                 }
                 // Standard countdown beep
@@ -728,21 +780,26 @@ function CaptureSession(): JSX.Element {
             completeCapture()
         }
     }
+    triggerCaptureRef.current = triggerCapture
+
+    // A shot needs a live preview stream (the live photo is recorded from it), except native DSLR without capture card
+    const needsPreviewStream = !((config.cameraMode === 'edsdk' || config.cameraMode === 'ptp') && !config.selectedCameraId)
+    const cameraReady = !isLoadingCamera && !cameraError && (!needsPreviewStream || !!streamRef.current)
+    // The keydown effect keeps an old handleReady closure, so read readiness through a ref
+    cameraReadyRef.current = cameraReady
+
     // Handle ready button
     const handleReady = (): void => {
+        if (!cameraReadyRef.current) {
+            console.warn('[CaptureSession] Ignoring shutter press: camera preview not ready yet')
+            return
+        }
         const next = getNextEmptySlot()
         if (next) {
             startCountdown(next.index)
         } else if (currentFrame && currentFrame.slots.length > 0) {
             // Retake first slot if all filled
             startCountdown(0)
-        }
-    }
-
-    // Handle slot click
-    const handleSlotClick = (slotIndex: number): void => {
-        if (captureState === 'idle') {
-            startCountdown(slotIndex)
         }
     }
 
@@ -758,13 +815,24 @@ function CaptureSession(): JSX.Element {
         }
     }, [allSlotsFilled, captureState, navigate])
 
+    // Concert mode: time is up → finish the shot in progress, then go straight to finalize
+    useEffect(() => {
+        if (concertTimeUp && captureState === 'idle') {
+            navigate('/finalize')
+        }
+    }, [concertTimeUp, captureState, navigate])
+
     // Keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
             if (captureState === 'idle') {
-                if (e.key === '1' || e.key === '2' || e.key === '3') {
+                // While the cancel dialog is open it handles 1 / 3 itself (capture phase)
+                if (e.key === '1') {
+                    e.preventDefault()
+                    setIsConfirmModalOpen(true)
+                } else if (e.key === '3') {
                     e.preventDefault()
                     handleReady()
                 }
@@ -840,18 +908,6 @@ function CaptureSession(): JSX.Element {
         }
     }
 
-    if (!currentFrame) {
-        return (
-            <div className={styles.container}>
-                <div className={styles.noFrame}>
-                    <h2>No Frame Selected</h2>
-                    <p>Please select a frame first.</p>
-                    <button onClick={() => navigate('/frames')}>Select Frame</button>
-                </div>
-            </div>
-        )
-    }
-
     // Custom camera preview adjustments
     const zoomVal = config.cameraZoom || 1.0;
     const offsetX = config.cameraOffsetX || 0;
@@ -866,6 +922,32 @@ function CaptureSession(): JSX.Element {
     const captureCardTransform = `translate(${offsetX}px, ${offsetY}px) scaleX(${-1 * scaleXCardVal * zoomVal}) scaleY(${scaleYVal * zoomVal})`;
     const standardTransform = `translate(${offsetX}px, ${offsetY}px) scaleX(${-1 * scaleXStandardVal * zoomVal}) scaleY(${scaleYVal * zoomVal})`;
 
+    const shotNumber = Math.min(photos.length + 1, captureSlots.length)
+    const touch = useInputMode() === 'touch'
+    useEmitOnChange(captureState, () => {
+        if (captureState === 'countdown') emitMascot('countdown')
+        else if (captureState === 'preview') emitMascot('shot')
+    })
+    useButtonHints(captureState !== 'idle' ? {}
+        : {
+            1: { label: 'Batalkan sesi', onScreen: true },
+            ...(cameraReady ? { 3: { label: allSlotsFilled ? 'Ulangi foto' : 'Ambil foto', primary: true, onScreen: true } } : {})
+        })
+    useRailStatus(`Foto ${shotNumber}/${captureSlots.length}`)
+
+    // Early return only after every hook above (rules of hooks)
+    if (!currentFrame) {
+        return (
+            <div className={styles.container}>
+                <div className={styles.noFrame}>
+                    <h2 className="kiosk-title">Belum pilih frame</h2>
+                    <p>Pilih frame dulu sebelum mulai foto.</p>
+                    <button onClick={() => navigate('/frames')}>Pilih frame</button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <motion.div
             className={styles.container}
@@ -877,81 +959,63 @@ function CaptureSession(): JSX.Element {
             <canvas ref={canvasRef} style={{ display: 'none' }} />
 
             {/* Session Timer Overlay */}
-            <SessionTimer
-                duration={config.captureTimeout}
-                onTimeout={() => navigate('/review')}
-                enabled={config.sessionTimerEnabled}
-                label="Capture Session"
-            />
+            {isConcert ? (
+                <SessionTimer
+                    duration={concertSecondsLeft}
+                    onTimeout={() => setConcertTimeUp(true)}
+                    enabled={!!deadline}
+                    label="Sisa Waktu"
+                />
+            ) : (
+                <SessionTimer
+                    duration={config.captureTimeout}
+                    onTimeout={() => navigate('/review')}
+                    enabled={config.sessionTimerEnabled}
+                    label="Capture Session"
+                />
+            )}
 
-            <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                onClick={() => setIsConfirmModalOpen(true)}
-                title="Back to Home"
-                style={{
-                    position: 'fixed',
-                    top: '20px',
-                    left: '20px',
-                    padding: '6px 12px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    zIndex: 100
-                }}
-            >
-                ← Kembali
-            </motion.button>
-
-            {/* Gear Button for Live View adjustment */}
-            <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                onClick={() => setIsAdjustPanelOpen(!isAdjustPanelOpen)}
-                title="Adjust Live View"
-                style={{
-                    position: 'fixed',
-                    top: '20px',
-                    right: '20px',
-                    padding: '6px 12px',
-                    backgroundColor: '#f8f9fa',
-                    border: '1px solid #dee2e6',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    zIndex: 100,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontWeight: 'bold',
-                    color: '#333'
-                }}
-            >
-                ⚙️ {isAdjustPanelOpen ? 'Tutup Atur' : 'Atur Live View'}
-            </motion.button>
+            {/* Top bar: operator button (top-left corner), SessionTimer chip at the same top/height on the right.
+                Cancelling the session is physical button 1. */}
+            <div className={styles.operatorBar}>
+                {/* Touch booth has no rail: cancel and progress live up here */}
+                {touch && captureState === 'idle' && (
+                    <button type="button" className={styles.operatorBtn} onClick={() => setIsConfirmModalOpen(true)}>
+                        Batal
+                    </button>
+                )}
+                {touch && (
+                    <span className={`${styles.operatorBtn} ${styles.progressChip}`}>Foto {shotNumber}/{captureSlots.length}</span>
+                )}
+                {/* Gear Button for Live View adjustment */}
+                <motion.button
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    onClick={() => setIsAdjustPanelOpen(!isAdjustPanelOpen)}
+                    title="Atur live view"
+                    className={styles.operatorBtn}
+                >
+                    {isAdjustPanelOpen ? 'Tutup atur' : 'Atur live view'}
+                </motion.button>
+            </div>
 
             {/* Main Capture Area */}
             <div className={styles.captureArea}>
-                {/* Controls Bar - No back button to prevent timer circumvention */}
-                <div className={styles.controlsBar}>
-                    <div className={styles.controlsRight}>
-                        <div className={styles.photoInfo}>
-                            <span className={styles.photoCount}>
-                                {photos.length < captureSlots.length
-                                    ? `Photo ${photos.length + 1} of ${captureSlots.length}`
-                                    : `${photos.length} of ${captureSlots.length} ✓`}
-                            </span>
-                            <span className={styles.frameNumber}>{currentFrame.name}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Live Viewfinder */}
+                {/* Live Viewfinder — fills whatever height is left under the top bar */}
+                <div className={styles.viewfinderSlot}>
                 <div
                     className={styles.viewfinder}
-                    style={{ aspectRatio: slotAspectRatio }}
+                    style={(() => {
+                        // Box = the camera's own aspect (after rotation), as large as fits, pinned to the
+                        // top of the slot. The dark safe-area bars inside it mark the photo guide.
+                        const r = config.cameraRotation || 0
+                        const a = videoAspect ? (r === 90 || r === 270 ? 1 / videoAspect : videoAspect) : (slotAspectNumeric || 4 / 3)
+                        return {
+                            aspectRatio: a,
+                            width: `min(100cqw, ${a * 100}cqh)`,
+                            height: 'auto'
+                        }
+                    })()}
                     ref={viewfinderRef}
                 >
                     {/* Camera Feed — Webcam, digiCamControl/Canon EDSDK Live View, with rotation support */}
@@ -993,6 +1057,10 @@ function CaptureSession(): JSX.Element {
                                     muted
                                     className={styles.video}
                                     style={getVideoStyle(captureCardTransform)}
+                                    onLoadedMetadata={(e) => {
+                                        const v = e.currentTarget
+                                        if (v.videoWidth && v.videoHeight) setVideoAspect(v.videoWidth / v.videoHeight)
+                                    }}
                                 />
                             )
                         }
@@ -1009,7 +1077,9 @@ function CaptureSession(): JSX.Element {
                                         (e.target as HTMLImageElement).style.opacity = '0.3'
                                     }}
                                     onLoad={(e) => {
-                                        (e.target as HTMLImageElement).style.opacity = '1'
+                                        const im = e.target as HTMLImageElement
+                                        im.style.opacity = '1'
+                                        if (im.naturalWidth && im.naturalHeight) setVideoAspect(im.naturalWidth / im.naturalHeight)
                                     }}
                                 />
                             )
@@ -1023,6 +1093,10 @@ function CaptureSession(): JSX.Element {
                                 muted
                                 className={styles.video}
                                 style={getVideoStyle(standardTransform)}
+                                onLoadedMetadata={(e) => {
+                                    const v = e.currentTarget
+                                    if (v.videoWidth && v.videoHeight) setVideoAspect(v.videoWidth / v.videoHeight)
+                                }}
                             />
                         )
                     })()}
@@ -1061,21 +1135,20 @@ function CaptureSession(): JSX.Element {
                     {isLoadingCamera && (
                         <div className={styles.loadingOverlay}>
                             <div className={styles.spinner}></div>
-                            <p>Initializing camera...</p>
+                            <p>Menyiapkan kamera...</p>
                         </div>
                     )}
 
                     {/* Camera Error Overlay */}
                     {cameraError && (
                         <div className={styles.errorOverlay}>
-                            <span className={styles.errorIcon}>📷</span>
-                            <h3>Camera Error</h3>
+                            <h3>Kamera bermasalah</h3>
                             <p>{cameraError}</p>
                             <button
                                 onClick={() => window.location.reload()}
                                 className={styles.retryButton}
                             >
-                                🔄 Retry
+                                Coba lagi
                             </button>
                         </div>
                     )}
@@ -1089,18 +1162,9 @@ function CaptureSession(): JSX.Element {
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                             >
-                                <motion.span
-                                    key={countdown}
-                                    className={styles.countdownNumber}
-                                    initial={{ scale: 0.5, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    exit={{ scale: 1.5, opacity: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                >
-                                    {countdown}
-                                </motion.span>
+                                <CountdownBurst key={countdown} value={countdown} />
                                 <span className={styles.slotIndicator}>
-                                    Photo {captureSlots.findIndex(s => s.id === currentFrame.slots[currentSlotIndex]?.id) + 1} of {captureSlots.length}
+                                    Foto {captureSlots.findIndex(s => s.id === currentFrame.slots[currentSlotIndex]?.id) + 1} dari {captureSlots.length}
                                 </span>
                             </motion.div>
                         )}
@@ -1115,7 +1179,9 @@ function CaptureSession(): JSX.Element {
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.1 }}
-                            />
+                            >
+                                <SnapBurst />
+                            </motion.div>
                         )}
                     </AnimatePresence>
 
@@ -1134,114 +1200,29 @@ function CaptureSession(): JSX.Element {
                                     className={styles.previewImage}
                                 />
                                 <div className={styles.previewBadge}>
-                                    <span className={styles.checkmark}>✓</span>
-                                    Photo {captureSlots.findIndex(s => s.id === currentFrame.slots[currentSlotIndex]?.id) + 1} saved!
+                                    Foto {captureSlots.findIndex(s => s.id === currentFrame.slots[currentSlotIndex]?.id) + 1} tersimpan
                                 </div>
                             </motion.div>
                         )}
                     </AnimatePresence>
-                </div>
-
-                {/* Ready Button */}
-                {captureState === 'idle' && (
-                    <div className={styles.readyButtonContainer}>
-                        <motion.button
-                            className={styles.readyButton}
-                            onClick={handleReady}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                        >
-                            📸 {allSlotsFilled ? 'Retake Photo' : 'Take Photo'}
-                        </motion.button>
-                    </div>
-                )}
-            </div>
-
-            {/* Floating Photo Gallery Overlay */}
-            <div className={`${styles.floatingGallery} ${isGalleryExpanded ? styles.expanded : ''}`}>
-                <div 
-                    className={styles.galleryToggle}
-                    onClick={() => setIsGalleryExpanded(!isGalleryExpanded)}
-                >
-                    {/* Always show the last photo (or a placeholder) as the toggle icon */}
-                    {photos.length > 0 ? (
-                        <div className={styles.toggleThumbnail}>
-                            <img src={photos[photos.length - 1].imagePath} alt="Last Capture" />
-                            <span className={styles.photoCountBadge}>{photos.length}/{captureSlots.length}</span>
-                        </div>
-                    ) : (
-                        <div className={styles.toggleThumbnailEmpty}>
-                            📸 <span>{photos.length}/{captureSlots.length}</span>
+                    {/* Ready Button — sticker overlaid on the bottom of the preview */}
+                    {captureState === 'idle' && cameraReady && (
+                        <div className={styles.readyButtonContainer}>
+                            <button className={styles.readyButton} onClick={handleReady}>
+                                {touch ? (
+                                    <span>{allSlotsFilled ? 'Ketuk untuk ulangi foto' : 'Ketuk untuk ambil foto'}</span>
+                                ) : (
+                                    <>
+                                        <span>Tekan</span>
+                                        <span className={styles.readyKey}>3</span>
+                                        <span>{allSlotsFilled ? 'untuk ulangi foto' : 'untuk ambil foto'}</span>
+                                    </>
+                                )}
+                            </button>
                         </div>
                     )}
                 </div>
-
-                <AnimatePresence>
-                    {isGalleryExpanded && (
-                        <motion.div 
-                            className={styles.galleryPanel}
-                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-                            transition={{ duration: 0.2 }}
-                        >
-                            <div className={styles.sidebarHeader}>
-                                <h3>Your Photos</h3>
-                                <button 
-                                    className={styles.closeGalleryBtn} 
-                                    onClick={() => setIsGalleryExpanded(false)}
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                            
-                            <div className={styles.slotGridWrapper}>
-                                <div className={styles.slotGrid}>
-                                    {captureSlots.map((slot, sequentialIndex) => {
-                                        const photo = photos.find(p => p.slotId === slot.id)
-                                        const originalIndex = currentFrame.slots.findIndex(s => s.id === slot.id)
-                                        const isCurrentSlot = currentSlotIndex === originalIndex && captureState !== 'idle'
-            
-                                        return (
-                                            <motion.div
-                                                key={slot.id}
-                                                className={`${styles.slotThumbnail} ${photo ? styles.filled : ''} ${isCurrentSlot ? styles.active : ''}`}
-                                                onClick={() => {
-                                                    handleSlotClick(originalIndex)
-                                                    setIsGalleryExpanded(false) // Optionally auto-close when retaking
-                                                }}
-                                                whileHover={{ scale: 1.02 }}
-                                                whileTap={{ scale: 0.98 }}
-                                            >
-                                                {photo ? (
-                                                    <img src={photo.imagePath} alt={`Photo ${sequentialIndex + 1}`} />
-                                                ) : (
-                                                    <span className={styles.slotNumber}>{sequentialIndex + 1}</span>
-                                                )}
-                                                {photo && <span className={styles.retakeHint}>Tap to retake</span>}
-                                            </motion.div>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-            
-                            <motion.button
-                                className={`${styles.doneButton} ${allSlotsFilled ? styles.ready : ''}`}
-                                onClick={handleDone}
-                                disabled={photos.length === 0 || captureState === 'reviewPopup'}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                {allSlotsFilled ? '✨ Continue to Edit' : `${photos.length}/${captureSlots.length} Photos`}
-                            </motion.button>
-
-                            <div className={styles.connectionStatus}>
-                                <span className={`${styles.statusDot} ${isConnected ? styles.connected : ''}`} />
-                                {isConnected ? 'Camera Connected' : 'Using Webcam'}
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                </div>
             </div>
 
             {/* Review Popup */}
@@ -1335,13 +1316,13 @@ function CaptureSession(): JSX.Element {
                                     className={styles.retakeBtn}
                                     onClick={handleRetakeFromPopup}
                                 >
-                                    📸 Retake This Photo
+                                    Ulangi foto ini
                                 </button>
                                 <button
                                     className={styles.continueBtn}
                                     onClick={handleContinueToReview}
                                 >
-                                    Continue to Edit ✨
+                                    Lanjut
                                 </button>
                             </div>
                         </motion.div>
@@ -1368,8 +1349,8 @@ function CaptureSession(): JSX.Element {
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                         style={{
                             position: 'fixed',
-                            top: '80px',
-                            right: '20px',
+                            top: 'calc(var(--top-chip-top) + var(--top-chip-h) + 12px)',
+                            right: 'calc(var(--rail-w) + 20px)',
                             width: '320px',
                             backgroundColor: 'rgba(26, 26, 46, 0.95)',
                             backdropFilter: 'blur(10px)',
@@ -1382,13 +1363,13 @@ function CaptureSession(): JSX.Element {
                         }}
                     >
                         <h3 style={{ margin: '0 0 15px 0', borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            ⚙️ Pengaturan Live View
+                            Pengaturan Live View
                         </h3>
 
                         {/* Zoom Slider */}
                         <div style={{ marginBottom: '15px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                                <label>🔎 Zoom (Uniform)</label>
+                                <label>Zoom (Uniform)</label>
                                 <span>{Math.round((config.cameraZoom || 1.0) * 100)}%</span>
                             </div>
                             <input
@@ -1439,7 +1420,7 @@ function CaptureSession(): JSX.Element {
                         {/* Offset X Slider */}
                         <div style={{ marginBottom: '15px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                                <label>⬅️➡️ Geser Horizontal (X)</label>
+                                <label>⬅️Geser Horizontal (X)</label>
                                 <span>{config.cameraOffsetX || 0}px</span>
                             </div>
                             <input

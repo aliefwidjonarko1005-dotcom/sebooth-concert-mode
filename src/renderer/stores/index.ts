@@ -21,8 +21,6 @@ interface AppConfigState {
     config: AppConfig
     updateConfig: (updates: Partial<AppConfig>) => void
     resetConfig: () => void
-    isLayoutEditMode: boolean
-    setIsLayoutEditMode: (active: boolean) => void
     showGridLines: boolean
     setShowGridLines: (show: boolean) => void
     showCenterLines: boolean
@@ -84,6 +82,14 @@ const defaultConfig: AppConfig = {
     printClientEnabled: false,
     printServerUrl: '',
     deviceName: 'Booth A',
+    concertMode: false,
+    concertSessionSeconds: 240,
+    concertPrintQuantity: 2,
+    boothCode: 'B1',
+    concertCounter: 0,
+    buttonRailEnabled: true,
+    landingArt: { enabled: true, style: 'aurora', colors: ['#ff4500', '#fe6b00', '#5b8cff'], opacity: 0.85, liveOpacity: 0.35, speed: 1 },
+    buttonRailPositions: [22, 50, 78],
     // Camera Preview Adjustments
     cameraZoom: 1.0,
     cameraScaleX: 1.0,
@@ -173,8 +179,6 @@ export const useAppConfig = create<AppConfigState>((set) => {
 
     return {
         config: defaultConfig,
-        isLayoutEditMode: false,
-        setIsLayoutEditMode: (active) => set({ isLayoutEditMode: active }),
         showGridLines: true,
         setShowGridLines: (show) => set({ showGridLines: show }),
         showCenterLines: true,
@@ -425,6 +429,11 @@ interface SessionState {
     setSessionFilter: (filterId: string) => void
     isMirrored: boolean
     setIsMirrored: (mirror: boolean) => void
+    // Concert mode: one shared deadline (ms epoch) for capture + retake, and the pickup code
+    deadline: number | null
+    setDeadline: (deadline: number | null) => void
+    pickupLabel: string | null
+    setPickupLabel: (label: string | null) => void
 }
 
 export const useSessionStore = create<SessionState>((set) => ({
@@ -450,7 +459,9 @@ export const useSessionStore = create<SessionState>((set) => ({
 
     endSession: () => set({
         currentSession: null,
-        photos: []
+        photos: [],
+        deadline: null,
+        pickupLabel: null
     }),
 
     addPhoto: (slotId, imagePath, videoPath) => set((state) => {
@@ -518,7 +529,13 @@ export const useSessionStore = create<SessionState>((set) => ({
 
     setIsMirrored: (mirror) => set({
         isMirrored: mirror
-    })
+    }),
+
+    deadline: null,
+    setDeadline: (deadline) => set({ deadline }),
+
+    pickupLabel: null,
+    setPickupLabel: (pickupLabel) => set({ pickupLabel })
 }))
 
 // ================================

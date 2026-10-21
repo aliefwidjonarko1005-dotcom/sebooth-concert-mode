@@ -1,27 +1,25 @@
 .container {
-    width: 100vw;
+    width: 100%;
     height: 100vh;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    background: var(--clay-cream);
+    background: transparent;
     position: relative;
     overflow: hidden;
-    color: var(--color-text-main);
+    color: #FFFFFF;
 }
 
 .title {
-    font-size: 48px;
-    font-weight: 900;
+    font-size: 96px;
     margin-bottom: var(--spacing-sm);
     text-align: center;
-    color: var(--color-text-main);
 }
 
 .subtitle {
     font-size: var(--font-size-xl);
-    color: var(--color-text-secondary);
+    color: rgba(255, 255, 255, 0.9);
     font-weight: 700;
     margin-bottom: var(--spacing-2xl);
     text-align: center;
@@ -32,12 +30,14 @@
 .qrContainer {
     background: #FFFFFF;
     padding: 32px 40px;
-    border-radius: var(--radius-2xl);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    border-radius: var(--sticker-radius);
+    border: 5px solid var(--brand-ink);
+    box-shadow: 12px 14px 0 var(--brand-orange), 12px 14px 0 5px var(--brand-ink);
     display: flex;
     flex-direction: column;
     align-items: center;
-    border: none;
+    color: var(--brand-ink);
+    transform: rotate(-1deg);
 }
 
 .qrCode {
@@ -50,7 +50,7 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    box-shadow: var(--clay-shadow-lg);
+    border: 3px solid var(--brand-ink);
 }
 
 .loadingQr {
@@ -66,78 +66,23 @@
     width: 40px;
     height: 40px;
     border: 4px solid rgba(0,0,0,0.08);
-    border-top-color: var(--clay-blue);
+    border-top-color: var(--brand-royal);
     border-radius: 50%;
     animation: spin 0.9s linear infinite;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.errorText {
+    color: var(--brand-orange);
+}
+
 .scanText {
     margin-top: var(--spacing-lg);
-    color: var(--color-text-secondary);
+    color: var(--brand-ink);
     font-weight: 800;
     font-size: var(--font-size-lg);
 }
-
-/* Bottom Controls */
-.bottomControls {
-    position: absolute;
-    bottom: 40px;
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    padding: 0 60px;
-    box-sizing: border-box;
-    z-index: 20;
-}
-
-.btnIcon {
-    width: 32px;
-    height: 32px;
-    object-fit: contain;
-    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
-}
-
-.homeButton {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: var(--spacing-lg) var(--spacing-2xl);
-    background: #FFFFFF;
-    color: #1A1A2E;
-    border: none;
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-xl);
-    font-weight: 800;
-    cursor: pointer;
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: var(--clay-shadow);
-}
-
-.homeButton:hover { transform: translateY(-4px) scale(1.02); box-shadow: var(--clay-shadow-lg); }
-.homeButton:active { transform: scale(0.92); filter: brightness(0.95); }
-
-/* Big green print button */
-.printButton {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: var(--spacing-lg) var(--spacing-3xl);
-    background: var(--clay-green);
-    color: #FFFFFF;
-    border: none;
-    border-radius: var(--radius-full);
-    font-size: var(--font-size-2xl);
-    font-weight: 900;
-    cursor: pointer;
-    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: var(--clay-shadow-green);
-}
-
-.printButton:hover { transform: translateY(-6px) scale(1.04); box-shadow: 0 16px 40px rgba(62, 193, 138, 0.55); }
-.printButton:hover .btnIcon { transform: scale(1.2) rotate(5deg); transition: transform 0.3s var(--transition-bouncy); }
-.printButton:active { transform: scale(0.92) translateY(4px); box-shadow: var(--clay-shadow-sm); }
 
 /* ── PORTRAIT MODE OVERRIDES ── */
 :global(body.app-portrait) .container {
@@ -147,7 +92,7 @@
 }
 
 :global(body.app-portrait) .title {
-    font-size: 36px !important;
+    font-size: 84px !important;
 }
 
 :global(body.app-portrait) .subtitle {
@@ -166,28 +111,31 @@
     padding: 20px !important;
 }
 
-:global(body.app-portrait) .bottomControls {
-    position: relative !important;
-    bottom: auto !important;
-    margin-top: 32px !important;
-    display: flex !important;
-    flex-direction: row !important;
-    justify-content: center !important;
-    gap: 16px !important;
-    padding: 0 20px !important;
-    width: 100% !important;
+/* ══ LANDSCAPE (touch booth) ONLY ══ Portrait must never be affected by rules below. */
+:global(body.app-landscape) .title {
+    font-size: clamp(56px, 8vh, 96px);
 }
 
-:global(body.app-portrait) .homeButton,
-:global(body.app-portrait) .printButton {
-    padding: var(--spacing-md) var(--spacing-xl) !important;
-    font-size: 17px !important;
+:global(body.app-landscape) .subtitle {
+    margin-bottom: var(--spacing-lg);
 }
 
-:global(body.app-portrait) .printButton {
-    flex: 1 !important;
-    max-width: 280px !important;
-    justify-content: center !important;
+:global(body.app-landscape) .qrContainer {
+    padding: 24px 28px;
 }
 
+/* QR follows the screen height (the code is drawn at 460px, scale it to the box) */
+:global(body.app-landscape) .qrCode {
+    width: min(500px, 44vh);
+    height: min(500px, 44vh);
+    padding: 16px;
+}
 
+:global(body.app-landscape) .qrCode svg {
+    width: 100%;
+    height: 100%;
+}
+
+:global(body.has-dock) .container {
+    padding-bottom: 112px;
+}

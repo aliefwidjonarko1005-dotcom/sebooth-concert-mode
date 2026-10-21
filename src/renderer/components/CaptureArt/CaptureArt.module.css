@@ -1,0 +1,282 @@
+/* ── Stage backdrop: one peeking mascot on a flat field ─────────────────── */
+.backdrop {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.mascot {
+    position: absolute;
+    left: -36px;
+    bottom: -28px;
+    width: 230px;
+    transform: rotate(12deg);
+}
+
+.mascot svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    animation: bob 2.8s ease-in-out infinite;
+}
+
+/* Squash-and-stretch hop, like a 2D cartoon idle */
+@keyframes bob {
+    0%, 100% { transform: translateY(0) scale(1, 1); }
+    40% { transform: translateY(-14px) scale(0.96, 1.05); }
+    55% { transform: translateY(0) scale(1.06, 0.93); }
+    70% { transform: translateY(0) scale(1, 1); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Googly-eye lens: glance left/right */
+.pupil {
+    animation: glance 4s ease-in-out infinite;
+}
+
+@keyframes glance {
+    0%, 40%, 100% { transform: translateX(0); }
+    50%, 80% { transform: translateX(-14px); }
+}
+
+/* ── Countdown starburst ─────────────────────────────────────────────────── */
+.countBurst {
+    position: relative;
+    width: min(62cqw, 340px);
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pop 0.45s cubic-bezier(0.34, 1.7, 0.5, 1) both;
+}
+
+.countBurstShape {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    animation: spin 6s linear infinite;
+}
+
+.countDigit {
+    position: relative;
+    font-size: min(36cqw, 200px);
+    line-height: 1;
+    color: #ffffff;
+    -webkit-text-stroke: 8px #00113a;
+    paint-order: stroke fill;
+    text-shadow: 6px 8px 0 #00113a;
+    animation: wiggle 1s ease-in-out infinite;
+}
+
+@keyframes pop {
+    0% { transform: scale(0.2) rotate(-25deg); opacity: 0; }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes wiggle {
+    0%, 100% { transform: rotate(-5deg); }
+    50% { transform: rotate(5deg); }
+}
+
+/* ── "Cekrek!" shutter burst ─────────────────────────────────────────────── */
+.snap {
+    position: relative;
+    width: min(70cqw, 380px);
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: snapIn 0.35s cubic-bezier(0.34, 1.9, 0.5, 1) both;
+}
+
+.snapShape,
+.snapLines {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.snapLines {
+    inset: -18%;
+    width: 136%;
+    height: 136%;
+    animation: burstOut 0.5s ease-out both;
+}
+
+.snapText {
+    position: relative;
+    font-family: var(--font-display);
+    font-size: min(17cqw, 92px);
+    line-height: 1;
+    color: var(--brand-orange);
+    -webkit-text-stroke: 5px #00113a;
+    paint-order: stroke fill;
+    text-shadow: 4px 5px 0 #00113a;
+    transform: rotate(-8deg);
+}
+
+@keyframes snapIn {
+    0% { transform: scale(0.5) rotate(20deg); opacity: 0; }
+    100% { transform: scale(1) rotate(-4deg); opacity: 1; }
+}
+
+@keyframes burstOut {
+    0% { transform: scale(0.6); opacity: 0; }
+    40% { opacity: 1; }
+    100% { transform: scale(1.1); opacity: 0.9; }
+}
+
+/* ── Queue hourglass: flips every few seconds, sand drains top → bottom ── */
+.hourglass {
+    overflow: visible;
+    transform-origin: 50% 50%;
+    animation: flip 4s cubic-bezier(0.6, -0.3, 0.3, 1.4) infinite;
+}
+
+.sandTop {
+    transform-origin: 80px 92px;
+    animation: drain 4s linear infinite;
+}
+
+.sandBottom {
+    transform-origin: 80px 156px;
+    animation: fill 4s linear infinite;
+}
+
+@keyframes flip {
+    0%, 85% { transform: rotate(0deg); }
+    100% { transform: rotate(180deg); }
+}
+
+@keyframes drain {
+    0% { transform: scaleY(1); }
+    85%, 100% { transform: scaleY(0.1); }
+}
+
+@keyframes fill {
+    0% { transform: scaleY(0.15); }
+    85%, 100% { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hourglass,
+    .sandTop,
+    .sandBottom,
+    .mascot svg,
+    .pupil,
+    .countBurst,
+    .countBurstShape,
+    .countDigit,
+    .snap,
+    .snapLines {
+        animation: none !important;
+    }
+}
+
+/* ══ LANDSCAPE (touch booth) ONLY ══ Portrait must never be affected by rules below. */
+:global(body.app-landscape) .mascot {
+    left: auto;
+    right: -30px;
+    width: 180px;
+    transform: rotate(-12deg) scaleX(-1);
+}
+
+/* ── Lively stage (touch / landscape, not the homepage): booth-world motion ── */
+.film {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 44px;
+    overflow: hidden;
+    opacity: 0.55;
+}
+
+.filmTrack {
+    display: flex;
+    width: 200%;
+    height: 100%;
+    animation: filmRoll 28s linear infinite;
+}
+
+.filmStrip {
+    width: 50%;
+    height: 100%;
+    flex: none;
+}
+
+@keyframes filmRoll {
+    to { transform: translateX(-50%); }
+}
+
+.printer {
+    position: absolute;
+    left: 28px;
+    bottom: 30px;
+    width: 150px;
+}
+
+.printer svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.printOut {
+    animation: printOut 6s cubic-bezier(0.3, 0.9, 0.3, 1) infinite;
+}
+
+@keyframes printOut {
+    0%, 12% { transform: translateY(110px); }
+    40%, 70% { transform: translateY(0) rotate(-3deg); }
+    82% { transform: translateY(-14px) rotate(2deg); }
+    100% { transform: translateY(110px); }
+}
+
+.printerLed {
+    animation: led 6s steps(1) infinite;
+}
+
+@keyframes led {
+    0%, 12% { opacity: 0.4; }
+    13%, 40% { opacity: 1; }
+    41%, 100% { opacity: 0.4; }
+}
+
+/* The mascot takes a picture: lens blink + flash pop */
+.flash {
+    position: absolute;
+    top: -46px;
+    right: 6px;
+    width: 92px;
+    opacity: 0;
+    transform-origin: center;
+    animation: flashPop 5s ease-out infinite;
+}
+
+@keyframes flashPop {
+    0%, 70% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+    74% { opacity: 1; transform: scale(1.1) rotate(10deg); }
+    86% { opacity: 0.9; transform: scale(1) rotate(16deg); }
+    100% { opacity: 0; transform: scale(1.3) rotate(24deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .filmTrack,
+    .printOut,
+    .printerLed,
+    .flash {
+        animation: none;
+    }
+}
+

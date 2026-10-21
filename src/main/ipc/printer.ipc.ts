@@ -12,6 +12,15 @@ import * as os from 'os'
  * Register all printer-related IPC handlers
  */
 export function registerPrinterHandlers(ipcMain: IpcMain): void {
+    // Resend print jobs that were saved while the print server was unreachable
+    setInterval(() => {
+        const config = configService.getConfig()
+        if (!config.printClientEnabled || !config.printServerUrl) return
+        remotePrintService.setServerUrl(config.printServerUrl)
+        remotePrintService.flushPending()
+        remotePrintService.sendHeartbeat(config.deviceName || 'Booth', config.boothCode)
+    }, 10000)
+
 
     // List available printers
     ipcMain.handle('printer:list', async (): Promise<APIResponse<PrinterDevice[]>> => {
@@ -98,8 +107,8 @@ export function registerPrinterHandlers(ipcMain: IpcMain): void {
     // Send print job to remote print server (Print Client mode)
     ipcMain.handle('printer:remote-print', async (
         _,
-        options: { imageData: string; copies: number; sessionId: string }
-    ): Promise<APIResponse<{ jobId?: string }>> => {
+        options: { imageData: string; copies: number; sessionId: string; label?: string }
+    ): Promise<APIResponse<{ jobId?: string; queued?: boolean }>> => {
         try {
             const config = configService.getConfig()
 
@@ -110,15 +119,16 @@ export function registerPrinterHandlers(ipcMain: IpcMain): void {
             // Ensure RemotePrintService has the latest URL
             remotePrintService.setServerUrl(config.printServerUrl)
 
-            const result = await remotePrintService.sendPrintJob({
+            const result = await remotePrintService.sendOrQueue({
                 imageData: options.imageData,
                 copies: options.copies,
                 sessionId: options.sessionId,
-                deviceName: config.deviceName || 'Unknown Device'
+                deviceName: config.deviceName || 'Unknown Device',
+                label: options.label
             })
 
             if (result.success) {
-                return { success: true, data: { jobId: result.jobId } }
+                return { success: true, data: { jobId: result.jobId, queued: result.queued } }
             } else {
                 return { success: false, error: result.error || 'Remote print failed' }
             }

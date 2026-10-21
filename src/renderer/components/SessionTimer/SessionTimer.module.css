@@ -1,56 +1,42 @@
+/* Top-right chip inside the stage (left of the button rail), so it never covers page titles */
 .timerOverlay {
     position: fixed;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 9999;
+    top: var(--top-chip-top);
+    right: calc(var(--rail-w) + 24px);
+    z-index: 800;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    background: linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(20, 20, 30, 0.95) 100%);
-    border: 1px solid rgba(99, 102, 241, 0.3);
-    border-top: none;
-    border-radius: 0 0 12px 12px;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    gap: 10px;
+    height: var(--top-chip-h);
+    padding: 0 20px;
+    background: var(--brand-ink);
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    border-radius: var(--radius-full);
+    color: #FFFFFF;
+    font-family: var(--font-family);
 }
 
 .timerOverlay.warning {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.9) 0%, rgba(185, 28, 28, 0.9) 100%);
-    border-color: rgba(239, 68, 68, 0.5);
-    animation: pulse 0.5s ease-in-out infinite alternate;
+    background: var(--brand-orange);
+    border-color: var(--brand-orange);
+    animation: pulse 0.8s ease-in-out infinite alternate;
 }
 
 @keyframes pulse {
-    from {
-        box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3);
-    }
-
-    to {
-        box-shadow: 0 8px 32px rgba(239, 68, 68, 0.6);
-    }
+    from { transform: scale(1); }
+    to { transform: scale(1.06); }
 }
 
 .timerLabel {
-    font-size: 12px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.7);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 15px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.75);
 }
 
 .timerValue {
-    font-size: 18px;
-    font-weight: 700;
-    color: white;
+    font-size: 26px;
+    font-weight: 900;
+    color: #FFFFFF;
     font-variant-numeric: tabular-nums;
-}
-
-.warning .timerValue {
-    color: white;
-}
-
-.warningIcon {
-    font-size: 20px;
+    line-height: 1;
 }

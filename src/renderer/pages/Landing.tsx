@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useCameraStore, useFrameStore, useAppConfig } from '../stores'
 import styles from './Landing.module.css'
+import { startRoute } from './Tutorial'
+import { SeboothLogo } from '../components/brand/SeboothLogo'
+import { AmbientArt, DEFAULT_AMBIENT_ART } from '../components/brand/AmbientArt'
+import { useButtonHints, useInputMode } from '../components/ButtonRail/ButtonRail'
 
-// Placeholder illustration — swap with user's image once provided
-const ILLUSTRATION_SRC = './assets/landing-illustration.mp4'
 
 const ADMIN_PASSWORD = 'admin123'
 
@@ -34,7 +36,6 @@ function Landing(): JSX.Element {
     const [holdProgress, setHoldProgress] = useState(0)
     const [holdTimer, setHoldTimer] = useState<any | null>(null)
     const [showCameraMenu, setShowCameraMenu] = useState(false)
-    const [illustrationError, setIllustrationError] = useState(false)
 
     // Live Camera Background States
     const videoRef = useRef<HTMLVideoElement>(null)
@@ -192,13 +193,13 @@ function Landing(): JSX.Element {
             } else if (frames.length > 0) {
                 setActiveFrame(frames[0].id)
             }
-            navigate('/frames')
+            navigate(startRoute(config.concertMode))
         } catch (error) {
             console.error('Failed to start session:', error)
         } finally {
             setIsLoading(false)
         }
-    }, [isConnected, selectedCamera, setConnected, config.activeFrameId, setActiveFrame, frames, navigate])
+    }, [isConnected, selectedCamera, setConnected, config.activeFrameId, config.concertMode, setActiveFrame, frames, navigate])
 
     // Keydown & Keyup listener for 5-second Key 1 Hold and Sequential PIN 123
     useEffect(() => {
@@ -250,7 +251,7 @@ function Landing(): JSX.Element {
                     }
                 }, 50)
 
-            } else if (e.key === '2' || e.key === '3') {
+            } else if (e.key === '3') {
                 e.preventDefault()
                 handleStart()
             }
@@ -266,10 +267,8 @@ function Landing(): JSX.Element {
                     clearKey1Timer()
                     key1PressTimeRef.current = null
 
-                    // If released under 2 seconds, treat as normal start button press
-                    if (elapsed < 2000) {
-                        handleStart()
-                    }
+                    // Short press of 1 does nothing: only button 3 starts (1 is held 5s for admin)
+                    void elapsed
                 }
             }
         }
@@ -295,6 +294,10 @@ function Landing(): JSX.Element {
             setTimeout(() => setPasswordError(false), 2000)
         }
     }
+
+    const touch = useInputMode() === 'touch'
+    useButtonHints({ 3: { label: 'Mulai foto', primary: true, onScreen: true } })
+    const art = { ...DEFAULT_AMBIENT_ART, ...config.landingArt }
 
     return (
         <motion.div
@@ -376,15 +379,16 @@ function Landing(): JSX.Element {
                 )
             )}
 
+            {/* ── ABSTRACT ANIMATION: backdrop, or a translucent overlay above camera / custom background ── */}
+            <div className={styles.artLayer}>
+                <AmbientArt settings={art} overCamera={liveCameraEnabled || hasCustomBg} />
+            </div>
+
             {/* ── TOP NAV ── */}
             <header className={styles.navbar}>
                 {/* Left side: Logo + Live Camera Toggle */}
                 <div className={styles.navLeft}>
                     {/* Logo */}
-                    <div className={styles.navLogo}>
-                        <img src="./assets/icons/icon-camera.png" alt="Sebooth" className={styles.navLogoIcon} />
-                        <span className={styles.navLogoText}>Sebooth</span>
-                    </div>
 
                     {/* Live Camera Toggle Button */}
                     <button
@@ -392,7 +396,11 @@ function Landing(): JSX.Element {
                         onClick={() => setLiveCameraEnabled(v => !v)}
                         title={liveCameraEnabled ? 'Turn off camera' : 'Turn on camera'}
                     >
-                        <span className={styles.toggleIcon}>{liveCameraEnabled ? '📹' : '📷'}</span>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M23 7l-7 5 7 5V7z" />
+                            <rect x="1" y="5" width="15" height="14" rx="2" />
+                            {!liveCameraEnabled && <path d="M1 1l22 22" />}
+                        </svg>
                     </button>
                 </div>
 
@@ -446,66 +454,38 @@ function Landing(): JSX.Element {
                         title="Admin"
                     >
                         <div className={styles.adminProgress} style={{ width: `${holdProgress}%` }} />
-                        <span className={styles.adminGear}>⚙</span>
+                        <svg className={styles.adminGear} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+                        </svg>
                     </div>
                 </div>
             </header>
 
-            {/* ── HERO TEXT ── */}
+            {/* ── HERO: animated wordmark + call to action ── */}
             <section className={styles.hero}>
-                <motion.h1
-                    className={styles.headline}
-                    initial={{ y: 30, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.15, type: 'spring', stiffness: 100 }}
-                >
-                    Abadikan Momen,<br />
-                    <span className={styles.headlineAccent}>Ciptakan Kenangan.</span>
-                </motion.h1>
+                <SeboothLogo theme="royal" className={styles.heroLogo} />
+                <h1 className={`kiosk-title ${styles.headline}`}>
+                    Siap <em>berpose?</em>
+                </h1>
+                <button className={styles.ctaPrimary} onClick={handleStart} disabled={isLoading}>
+                    {isLoading ? (
+                        <SeboothLogo variant="mini" className={styles.ctaLoader} label="Memuat" />
+                    ) : (
+                        <>
+                            {touch ? (
+                                <span>Ketuk untuk mulai</span>
+                            ) : (
+                                <>
+                                    <span>Tekan tombol</span>
+                                    <span className={styles.ctaKey}>3</span>
+                                    <span>untuk mulai</span>
+                                </>
+                            )}
+                        </>
+                    )}
+                </button>
             </section>
-
-            {/* Absolute Centered Start Button */}
-            <motion.button
-                className={styles.ctaPrimary}
-                onClick={handleStart}
-                disabled={isLoading}
-                initial={{ opacity: 0, scale: 0.8, x: '-50%', y: '-50%' }}
-                animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
-                transition={{ delay: 0.45, type: 'spring', stiffness: 100 }}
-            >
-                {isLoading
-                    ? <span className={styles.loader} />
-                    : <> Mulai Sesi Foto &nbsp;→</>
-                }
-            </motion.button>
-
-            {/* ── ILLUSTRATION (VIDEO) ── */}
-            <motion.div
-                className={styles.illustrationWrap}
-                initial={{ y: 60, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.5, type: 'spring', stiffness: 70, damping: 18 }}
-            >
-                {!illustrationError ? (
-                    <video
-                        src={ILLUSTRATION_SRC}
-                        className={styles.illustration}
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        onError={() => setIllustrationError(true)}
-                    />
-                ) : (
-                    /* Placeholder shown until user provides video */
-                    <div className={styles.illustrationPlaceholder}>
-                        <span style={{ fontSize: 120, lineHeight: 1 }}>🎬</span>
-                        <p>Letakkan video ilustrasi Anda di<br />
-                            <code>src/renderer/assets/landing-illustration.mp4</code>
-                        </p>
-                    </div>
-                )}
-            </motion.div>
 
             {/* ── 5-Second Key 1 Hold Progress Bar ── */}
             {holdProgress > 0 && (
@@ -513,7 +493,7 @@ function Landing(): JSX.Element {
                     position: 'fixed',
                     top: 0,
                     left: 0,
-                    width: '100vw',
+                    width: 'calc(100vw - var(--rail-w))',
                     height: '8px',
                     backgroundColor: 'rgba(255, 255, 255, 0.2)',
                     zIndex: 9999
@@ -544,9 +524,9 @@ function Landing(): JSX.Element {
                             exit={{ scale: 0.9, y: 20 }}
                             onClick={e => e.stopPropagation()}
                         >
-                            <h3>🔒 Admin Access</h3>
+                            <h3>Akses Admin</h3>
                             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px', textAlign: 'center' }}>
-                                Tekan tombol <b>1 ➔ 2 ➔ 3</b> secara berurutan
+                                Tekan tombol <b>1 → 2 → 3</b> secara berurutan
                             </p>
 
                             {/* Sequential PIN Dots Indicator */}

@@ -4,6 +4,8 @@ import path from 'path';
 import fs from 'fs';
 import { uploadQueue } from '../services/UploadQueue';
 import { getGCSKeyPath } from '../lib/paths';
+import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, GCS_BUCKET_NAME } from '@shared/supabaseConfig';
 
 // dotenv is loaded centrally in lib/env.ts (imported first by index.ts)
 
@@ -25,39 +27,95 @@ try {
 }
 
 
-// Background worker to retry failed uploads
-setInterval(async () => {
-  if (!storage) return;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+
+export function isCloudUploadReady(): boolean {
+  return storage !== null;
+}
+
+// Background worker: drains the persisted queue in order (files before the DB rows that reference them).
+let isDraining = false;
+async function drainQueue(): Promise<void> {
+  if (isDraining) return;
   const pending = uploadQueue.getPendingQueue();
   if (pending.length === 0) return;
+  isDraining = true;
 
-  console.log(`[Cloud Storage] Attempting to process offline queue (${pending.length} items)...`);
-  
-  for (const item of pending) {
-    try {
-      const bucket = storage.bucket(item.bucketName);
-      if (!fs.existsSync(item.filePath)) {
-         console.warn(`[Cloud Storage] Queue item file missing, removing from queue: ${item.filePath}`);
-         uploadQueue.markSuccessful(item.id);
-         continue;
+  try {
+    for (const item of pending) {
+      if (item.kind === 'db') {
+        const { error } = await supabase.from(item.table!).upsert(item.row!, item.onConflict ? { onConflict: item.onConflict } : undefined);
+        if (!error) {
+          uploadQueue.markSuccessful(item.id);
+          continue;
+        }
+        // shortcut: an error with a Postgres code means the server answered (bad row), so drop it instead of blocking the queue forever
+        if (error.code) {
+          console.error(`[Cloud Queue] Dropping DB row for ${item.table}:`, error.message);
+          uploadQueue.markSuccessful(item.id);
+          continue;
+        }
+        uploadQueue.incrementRetry(item.id);
+        break; // offline: keep order, try again next tick
       }
 
-      await bucket.upload(item.filePath, {
-        destination: item.destinationPath,
-        metadata: { 
+      if (!storage) break;
+      if (!fs.existsSync(item.filePath)) {
+        console.warn(`[Cloud Queue] Queue item file missing, removing from queue: ${item.filePath}`);
+        uploadQueue.markSuccessful(item.id);
+        continue;
+      }
+      try {
+        await storage.bucket(item.bucketName).upload(item.filePath, {
+          destination: item.destinationPath,
+          metadata: {
             contentType: item.mimeType,
-            cacheControl: 'public, max-age=31536000' // Phase 2: Cache Control Header
-        }
-      });
-
-      console.log(`[Cloud Storage] Successfully uploaded queued item: ${item.destinationPath}`);
-      uploadQueue.markSuccessful(item.id);
-    } catch (error) {
-      console.error(`[Cloud Storage] Retry failed for ${item.destinationPath}`);
-      uploadQueue.incrementRetry(item.id);
+            cacheControl: 'public, max-age=31536000'
+          }
+        });
+        console.log(`[Cloud Queue] Uploaded: ${item.destinationPath}`);
+        uploadQueue.markSuccessful(item.id);
+      } catch (error) {
+        console.error(`[Cloud Queue] Upload failed for ${item.destinationPath}, will retry`);
+        uploadQueue.incrementRetry(item.id);
+        break;
+      }
     }
+  } finally {
+    isDraining = false;
   }
-}, 10000); // Check every 10 seconds for fast offline recovery
+}
+
+setInterval(() => { drainQueue().catch(e => console.error('[Cloud Queue] Drain error:', e)) }, 10000);
+
+/** Queue a finished session's media + Supabase rows. Never touches the network itself. */
+export function enqueueSessionUpload(params: {
+  sessionId: string;
+  eventName: string;
+  frameName: string;
+  files: { path: string; destName: string; mimeType: string; type: 'photo' | 'gif' | 'live'; isStrip?: boolean }[];
+}): void {
+  const { sessionId } = params;
+  uploadQueue.enqueueRow('sessions', {
+    id: sessionId,
+    event_name: params.eventName,
+    frame_name: params.frameName,
+    is_claimed: false,
+    created_at: new Date().toISOString()
+  }, 'id');
+
+  for (const f of params.files) {
+    const destinationPath = `${sessionId}/${f.destName}`;
+    uploadQueue.enqueue({ bucketName: GCS_BUCKET_NAME, destinationPath, filePath: f.path, mimeType: f.mimeType });
+    uploadQueue.enqueueRow('media', {
+      session_id: sessionId,
+      type: f.type,
+      url: `https://storage.googleapis.com/${GCS_BUCKET_NAME}/${destinationPath}`,
+      metadata: f.isStrip ? { is_strip: true } : {}
+    });
+  }
+  drainQueue().catch(e => console.error('[Cloud Queue] Drain error:', e));
+}
 
 export function registerCloudHandlers(): void {
   ipcMain.handle('cloud:upload-file', async (_, params: {

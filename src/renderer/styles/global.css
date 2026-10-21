@@ -1,40 +1,52 @@
 /* =============================================
    SEBOOTH - GLOBAL STYLES
-   Colorful Claymorphism v2
+   Brand tokens from sebooth-website (navy / royal / orange, Bayon + Hanken Grotesk).
+   Kiosk pages use the royal-blue poster theme in brand.css (.kiosk);
+   everything else uses the light brand palette below.
    ============================================= */
 
 :root {
+  /* Brand */
+  --brand-navy:   #002366;
+  --brand-ink:    #00113a;
+  --brand-royal:  #1d43c4;
+  --brand-royal-deep: #1636a3;
+  --brand-orange: #ff4500;
+  --brand-orange-soft: #fe6b00;
+  --brand-light:  #eef2ff;
+
   /* Base backgrounds */
-  --color-bg-primary:   #F5F0EB;  /* Warm cream */
-  --color-bg-secondary: #EDE8E3;
+  --color-bg-primary:   #EEF2FF;
+  --color-bg-secondary: #E0E6F8;
   --color-bg-tertiary:  #FFFFFF;
   --clay-bg:            #FFFFFF;
 
-  --color-surface:        rgba(255, 255, 255, 0.85);
-  --color-surface-hover:  rgba(255, 255, 255, 0.95);
-  --color-surface-active: #EDE8E3;
+  --color-surface:        rgba(255, 255, 255, 0.92);
+  --color-surface-hover:  #FFFFFF;
+  --color-surface-active: #E0E6F8;
 
-  --color-border:       rgba(0, 0, 0, 0.06);
-  --color-border-hover: rgba(0, 0, 0, 0.12);
+  --color-border:       rgba(0, 17, 58, 0.10);
+  --color-border-hover: rgba(0, 17, 58, 0.22);
 
   /* Text */
-  --color-text-primary:   #1A1A2E;
-  --color-text-secondary: #4A5568;
-  --color-text-tertiary:  #A0AEC0;
-  --color-text-main:      #1A1A2E;
+  --color-text-primary:   #00113a;
+  --color-text-secondary: #33415C;
+  --color-text-tertiary:  #7C87A3;
+  --color-text-main:      #00113a;
   --color-text-inv:       #FFFFFF;
 
   /* Semantic colors */
-  --color-accent:           #4F89F5;
-  --color-accent-hover:     #3A72E0;
-  --color-accent-glow:      rgba(79, 137, 245, 0.30);
-  --color-secondary-accent: #A78AE0;
-  --color-success:          #3EC18A;
-  --color-warning:          #F7C948;
-  --color-error:            #FF7C6E;
+  --color-accent:           #ff4500;
+  --color-accent-hover:     #e03d00;
+  --color-accent-glow:      rgba(255, 69, 0, 0.28);
+  --color-secondary-accent: #1d43c4;
+  --color-success:          #1f9d68;
+  --color-warning:          #f5a400;
+  --color-error:            #e5484d;
 
-  /* Typography */
-  --font-family: 'Inter', 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Typography (bundled locally via @fontsource — no network needed at events) */
+  --font-family: 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Bayon', Impact, 'Arial Narrow', sans-serif;
 
   --font-size-xs:   0.75rem;
   --font-size-sm:   0.875rem;
@@ -58,49 +70,55 @@
   --spacing-3xl: 4rem;
 
   /* Border Radius */
-  --radius-sm:   0.75rem;
-  --radius-md:   1rem;
-  --radius-lg:   1.5rem;
-  --radius-xl:   2rem;
-  --radius-2xl:  2.5rem;
+  --radius-sm:   0.5rem;
+  --radius-md:   0.75rem;
+  --radius-lg:   1rem;
+  --radius-xl:   1.25rem;
+  --radius-2xl:  1.5rem;
   --radius-full: 9999px;
 
-  /* ===================================================
-     COLORFUL CLAYMORPHISM v2 - CLEAN SHADOW SYSTEM
-     ONE layer shadow only. No inner shadows. No white.
-     Depth is created through COLOR, not shadow stacks.
-     =================================================== */
+  /* Legacy "clay" names, remapped onto the brand palette so older pages stay on-brand */
+  --clay-green:  #1f9d68;
+  --clay-yellow: #f5a400;
+  --clay-blue:   #1d43c4;
+  --clay-purple: #002366;
+  --clay-coral:  #ff4500;
+  --clay-orange: #fe6b00;
+  --clay-cream:  #EEF2FF;
+  --clay-navy:   #00113a;
 
-  /* Vibrant palette */
-  --clay-green:  #3EC18A;
-  --clay-yellow: #F7C948;
-  --clay-blue:   #4F89F5;
-  --clay-purple: #A78AE0;
-  --clay-coral:  #FF7C6E;
-  --clay-orange: #FF9F4B;
-  --clay-cream:  #F5F0EB;
-  --clay-navy:   #1A1A2E;
+  --clay-shadow:    0 6px 20px rgba(0, 17, 58, 0.10);
+  --clay-shadow-lg: 0 14px 36px rgba(0, 17, 58, 0.14);
+  --clay-shadow-sm: 0 2px 8px rgba(0, 17, 58, 0.08);
+  --clay-shadow-xl: 0 24px 56px rgba(0, 17, 58, 0.18);
 
-  /* Clean single-layer shadows */
-  --clay-shadow:    0 8px 28px rgba(0, 0, 0, 0.11);
-  --clay-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.14);
-  --clay-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.08);
-  --clay-shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.18);
+  --clay-shadow-green:  0 6px 18px rgba(31, 157, 104, 0.28);
+  --clay-shadow-yellow: 0 6px 18px rgba(245, 164, 0, 0.30);
+  --clay-shadow-blue:   0 6px 18px rgba(29, 67, 196, 0.30);
+  --clay-shadow-coral:  0 6px 18px rgba(255, 69, 0, 0.30);
+  --clay-shadow-purple: 0 6px 18px rgba(0, 35, 102, 0.28);
+  --clay-shadow-orange: 0 6px 18px rgba(254, 107, 0, 0.30);
 
-  /* Colored shadows for vibrant buttons */
-  --clay-shadow-green:  0 8px 28px rgba(62,  193, 138, 0.40);
-  --clay-shadow-yellow: 0 8px 28px rgba(247, 201, 72,  0.44);
-  --clay-shadow-blue:   0 8px 28px rgba(79,  137, 245, 0.40);
-  --clay-shadow-coral:  0 8px 28px rgba(255, 124, 110, 0.40);
-  --clay-shadow-purple: 0 8px 28px rgba(167, 138, 224, 0.40);
-  --clay-shadow-orange: 0 8px 28px rgba(255, 159, 75,  0.40);
-
-  /* Legacy aliases for backward compatibility */
   --clay-card:         var(--clay-shadow);
   --clay-card-accent:  var(--clay-shadow-blue);
-  --clay-pressed:      inset 0 4px 14px rgba(0, 0, 0, 0.20);
+  --clay-pressed:      inset 0 3px 10px rgba(0, 0, 0, 0.18);
   --clay-shadow-outer: var(--clay-shadow);
   --clay-shadow-inner: none;
+
+  /* Right-edge physical button rail (see components/ButtonRail) */
+  --rail-w: 0px;
+
+  /* Cartoon sticker system (flat fill, thick ink outline, hard offset shadow — no blur, no gradient) */
+  --brand-sun: #ffc928;
+  --ink-line: 4px solid var(--brand-ink);
+  --sticker-shadow: 0 8px 0 var(--brand-ink);
+  --sticker-shadow-sm: 0 5px 0 var(--brand-ink);
+  --sticker-shadow-pressed: 0 2px 0 var(--brand-ink);
+  --sticker-radius: 24px;
+
+  /* Top-of-stage chips (SessionTimer, page operator buttons) share one row height */
+  --top-chip-top: 24px;
+  --top-chip-h: 56px;
 
   /* Transitions */
   --transition-fast:   150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -134,10 +152,15 @@ body {
 }
 
 #root {
-  width: 100vw;
+  width: calc(100vw - var(--rail-w));
   height: 100vh;
   overflow: hidden;
 }
+
+/* Rail visible: pages render in the stage left of it */
+body.has-rail { --rail-w: 260px; }
+/* Portrait screens are only 1080px wide: slimmer rail so the stage keeps ~840px */
+body.app-portrait.has-rail { --rail-w: 236px; }
 
 /* Typography */
 h1, h2, h3, h4, h5, h6 {
@@ -269,10 +292,7 @@ input::placeholder {
 
 /* Gradient text utility */
 .gradient-text {
-  background: linear-gradient(135deg, var(--clay-blue) 0%, var(--clay-purple) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--brand-orange);
 }
 
 /* ==========================================
@@ -328,10 +348,19 @@ body.app-portrait {
 }
 
 body.app-portrait #root {
-  width: 100vw !important;
+  width: calc(100vw - var(--rail-w)) !important;
   height: 100vh !important;
   max-width: 100vw !important;
   position: relative !important;
   overflow: hidden !important;
   background-color: var(--clay-cream) !important;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }

@@ -2,7 +2,7 @@
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
+    right: var(--rail-w); /* stop at the button rail */
     bottom: 0;
     background: rgba(0, 0, 0, 0.7);
     display: flex;
@@ -95,4 +95,114 @@
 
 .confirmBtn:hover {
     background: #c82333;
+}
+
+/* ── Cartoon sticker skin (overrides the generic look above) ── */
+.modal {
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    border: 5px solid var(--brand-ink);
+    border-radius: var(--sticker-radius);
+    box-shadow: 12px 14px 0 var(--brand-orange), 12px 14px 0 5px var(--brand-ink);
+}
+
+.title {
+    color: var(--brand-ink);
+    font-weight: 900;
+}
+
+.closeBtn {
+    color: var(--brand-ink);
+}
+
+.cancelBtn,
+.confirmBtn {
+    border: var(--ink-line);
+    border-radius: var(--radius-full);
+    box-shadow: var(--sticker-shadow-sm);
+    font-weight: 900;
+}
+
+.cancelBtn,
+.cancelBtn:hover {
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    box-shadow: none;
+}
+
+.confirmBtn,
+.confirmBtn:hover {
+    background: var(--brand-orange);
+    color: #FFFFFF;
+}
+
+.cancelBtn:active,
+.confirmBtn:active {
+    transform: translateY(3px);
+    box-shadow: var(--sticker-shadow-pressed);
+}
+
+/* ── Physical-button layout: stacked like keys 1 (top) and 3 (bottom) ── */
+.modal {
+    max-width: 480px;
+    padding: 36px 32px 32px;
+}
+
+.title {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 56px;
+    line-height: 0.95;
+    text-transform: uppercase;
+}
+
+.subtitle {
+    font-size: 18px;
+    color: var(--brand-ink);
+    margin-bottom: 8px;
+}
+
+.actions {
+    flex-direction: column;
+    gap: 14px;
+}
+
+.cancelBtn,
+.confirmBtn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 24px 10px 10px;
+    font-size: 22px;
+    text-align: left;
+}
+
+.confirmBtn {
+    color: var(--brand-ink);
+}
+
+/* Number badge = the physical button to press */
+.key {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand-ink);
+    color: #FFFFFF;
+    font-size: 24px;
+    font-weight: 900;
+}
+
+.confirmBtn .key {
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    border: 3px solid var(--brand-ink);
+}
+
+/* Touch booth (landscape): no physical keys, so no key badges */
+:global(body.app-landscape) .key {
+    display: none;
 }

@@ -40,3 +40,8 @@ google-key.json
 gen-lang-client-*.json
 *-key.json
 
+
+# Agent tooling
+graphify-out/
+.agents/mcp_config.json
+.claude/settings.local.json

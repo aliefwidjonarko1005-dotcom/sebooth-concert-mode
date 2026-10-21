@@ -12,12 +12,17 @@
     "prebuild:dist": "node scripts/copy-ffmpeg.js && node scripts/copy-gcs-key.js",
     "build:win": "npm run prebuild:dist && npm run build && electron-builder --win",
     "build:mac": "npm run prebuild:dist && npm run build && electron-builder --mac",
-    "build:linux": "npm run prebuild:dist && npm run build && electron-builder --linux"
+    "build:linux": "npm run prebuild:dist && npm run build && electron-builder --linux",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "graph:update": "graphify update .",
+    "skills:index": "python scripts/gen-skills-index.py"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^3.0.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@fontsource/bayon": "^5.3.0",
+    "@fontsource/hanken-grotesk": "^5.3.0",
     "@google-cloud/storage": "^7.19.0",
     "@supabase/supabase-js": "^2.45.0",
     "@types/qrcode": "^1.5.6",
@@ -78,7 +83,9 @@
       {
         "from": "resources/",
         "to": "resources/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": ".env",

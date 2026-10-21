@@ -2,12 +2,12 @@ import express from 'express'
 import cors from 'cors'
 import { app } from 'electron'
 import { join, basename } from 'path'
-import { existsSync, readdirSync, statSync, writeFileSync } from 'fs'
+import { existsSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'fs'
 import { networkInterfaces } from 'os'
-import { tmpdir } from 'os'
 import { printerHandler } from './handlers/PrinterHandler'
 import { configService } from './services/ConfigService'
 import { printQueueService } from './services/PrintQueueService'
+import sharp from 'sharp'
 
 let serverInstance: any = null
 
@@ -265,6 +265,69 @@ export function startLocalServer(port = 5050) {
         }
     })
 
+    // --- Pickup counter (/loket) — used by the loket laptop and staff phones/tablets on the LAN ---
+
+    // Booths in Print Client mode report in every 10s with how many prints are still stuck on their side
+    const booths = new Map<string, { deviceName: string; boothCode?: string; pending: number; lastSeen: number }>()
+    server.post('/api/print/heartbeat', (req, res) => {
+        const { deviceName, boothCode, pending } = req.body || {}
+        if (!deviceName) return res.status(400).json({ success: false })
+        booths.set(deviceName, { deviceName, boothCode, pending: Number(pending) || 0, lastSeen: Date.now() })
+        res.json({ success: true })
+    })
+
+    server.get('/api/print/status', (req, res) => {
+        const config = configService.getConfig()
+        res.json({
+            serverTime: Date.now(),
+            version: printQueueService.version,
+            printServerEnabled: !!config.printServerEnabled,
+            printerName: config.printerName || '',
+            deviceName: config.deviceName || 'Print Server',
+            queueLength: printQueueService.getQueue().length,
+            booths: [...booths.values()]
+        })
+    })
+
+    // Small cached thumbnails so a phone can scroll hundreds of strips
+    const thumbCache = new Map<string, Buffer>()
+    server.get('/api/print/jobs/:id/thumb', async (req, res) => {
+        const job = printQueueService.findJob(req.params.id)
+        if (!job || !existsSync(job.filePath)) return res.status(404).end()
+        try {
+            let buf = thumbCache.get(job.filePath)
+            if (!buf) {
+                buf = await sharp(job.filePath).rotate().resize({ width: 360, withoutEnlargement: true }).jpeg({ quality: 70 }).toBuffer()
+                if (thumbCache.size > 500) thumbCache.delete(thumbCache.keys().next().value as string)
+                thumbCache.set(job.filePath, buf)
+            }
+            res.type('jpeg').set('Cache-Control', 'max-age=86400').send(buf)
+        } catch {
+            res.status(500).end()
+        }
+    })
+
+    server.get('/api/print/jobs/:id/image', (req, res) => {
+        const job = printQueueService.findJob(req.params.id)
+        if (!job || !existsSync(job.filePath)) return res.status(404).end()
+        res.sendFile(job.filePath)
+    })
+
+    server.post('/api/print/jobs/:id/reprint', (req, res) => {
+        const job = printQueueService.reprint(req.params.id)
+        res.status(job ? 200 : 404).json({ success: !!job, data: job })
+    })
+
+    server.post('/api/print/jobs/:id/picked-up', (req, res) => {
+        const job = printQueueService.setPickedUp(req.params.id, req.body?.pickedUp !== false)
+        res.status(job ? 200 : 404).json({ success: !!job, data: job })
+    })
+
+    server.post('/api/print/reprint-failed', (req, res) => {
+        const jobs = printQueueService.reprintFailed()
+        res.json({ success: true, count: jobs.length })
+    })
+
     // 3. API to trigger remote print
     server.post('/api/print/:sessionId', async (req, res) => {
         const { sessionId } = req.params
@@ -311,16 +374,24 @@ export function startLocalServer(port = 5050) {
         }
 
         try {
-            const { imageData, copies, sessionId, deviceName } = req.body
+            const { imageData, copies, sessionId, deviceName, label } = req.body
 
             if (!imageData) {
                 return res.status(400).json({ success: false, error: 'Missing imageData field' })
             }
 
-            // Save base64 data to temp file
+            // Clients resend until they get a reply, so the same session may arrive twice
+            const existing = sessionId ? printQueueService.findActiveBySession(sessionId) : undefined
+            if (existing) {
+                return res.json({ success: true, jobId: existing.id, duplicate: true })
+            }
+
+            // Keep the file (not tmp) so the pickup counter can show a thumbnail
             const base64Data = (imageData as string).replace(/^data:image\/\w+;base64,/, '')
             const buffer = Buffer.from(base64Data, 'base64')
-            const tempFilePath = join(tmpdir(), `remote_print_${Date.now()}.jpg`)
+            const jobsDir = join(app.getPath('userData'), 'print_jobs')
+            mkdirSync(jobsDir, { recursive: true })
+            const tempFilePath = join(jobsDir, `remote_print_${Date.now()}.jpg`)
             writeFileSync(tempFilePath, buffer)
 
             console.log(`[RemotePrint] Received job from "${deviceName || 'Unknown'}" | Session: ${sessionId} | Copies: ${copies} | File size: ${buffer.length} bytes`)
@@ -331,7 +402,8 @@ export function startLocalServer(port = 5050) {
                 tempFilePath,
                 config.printerName || 'Print to PDF',
                 copies || 1,
-                deviceName || 'Remote Device'
+                deviceName || 'Remote Device',
+                label
             )
 
             res.json({

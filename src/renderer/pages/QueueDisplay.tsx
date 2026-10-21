@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 import QRCode from 'react-qr-code'
 import { useAppConfig, useQueueStore, useFrameStore, useSessionStore } from '../stores'
 import styles from './QueueDisplay.module.css'
+import { startRoute } from './Tutorial'
+import { Hourglass } from '../components/CaptureArt/CaptureArt'
+import { useButtonHints } from '../components/ButtonRail/ButtonRail'
 
 const ADMIN_PASSWORD = 'admin123'
 const TICKET_TIMEOUT_SEC = 300 // 5 minutes
@@ -210,7 +213,7 @@ function QueueDisplay(): JSX.Element {
             console.error('[QueueDisplay] Failed to send webhook on dismiss:', e)
         }
 
-        navigate('/frames')
+        navigate(startRoute(config.concertMode))
     }
 
     // ── Auto-dismiss QR when scanned successfully ──
@@ -241,11 +244,13 @@ function QueueDisplay(): JSX.Element {
         const frameId = config.activeFrameId || (config.activeFrameIds?.[0]) || (frames.length > 0 ? frames[0].id : '')
         if (frameId) setActiveFrame(frameId)
         startSession(frameId)
-        navigate('/frames')
+        navigate(startRoute(config.concertMode))
     }
 
     // ── Determine display state ──
     const isCalled = currentTicket?.status === 'called'
+
+    useButtonHints({ 3: { label: showQR ? 'Lanjut' : 'Mulai sesi', primary: true, onScreen: true } })
 
     // Keyboard navigation
     useEffect(() => {
@@ -324,8 +329,8 @@ function QueueDisplay(): JSX.Element {
             {/* Connection Status Banner */}
             <div className={`${styles.connectionBanner} ${isConnected ? styles.connected : styles.disconnected}`}>
                 {isConnected
-                    ? `🟢 Terhubung ke ${queueStatus?.event?.name || 'Event'}`
-                    : `⚠️ ${connectionError || 'Menghubungkan ke server...'}`
+                    ? `Terhubung ke ${queueStatus?.event?.name || 'Event'}`
+                    : `${connectionError || 'Menghubungkan ke server...'}`
                 }
             </div>
 
@@ -353,7 +358,7 @@ function QueueDisplay(): JSX.Element {
                         exit={{ opacity: 0, scale: 0.95 }}
                         transition={{ duration: 0.4 }}
                     >
-                        <div className={styles.idleIcon}>⏳</div>
+                        <div className={styles.idleIcon}><Hourglass /></div>
 
                         <h1 className={styles.idleTitle}>
                             Menunggu Antrean<br />Berikutnya...
@@ -390,7 +395,7 @@ function QueueDisplay(): JSX.Element {
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.5 }}
                             >
-                                Mulai Tanpa Antrean →
+                                Mulai tanpa antrean
                             </motion.button>
                         )}
                     </motion.div>
@@ -420,7 +425,7 @@ function QueueDisplay(): JSX.Element {
                         )}
 
                         <p className={styles.calledInstruction}>
-                            SILAKAN MENUJU BOOTH 📸
+                            SILAKAN MENUJU BOOTH 
                         </p>
 
                         <div className={styles.timeoutBar}>
@@ -443,7 +448,7 @@ function QueueDisplay(): JSX.Element {
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                         >
-                            {isStartingSession ? '⏳ Memulai...' : '▶ MULAI SESI FOTO'}
+                            {isStartingSession ? 'Memulai...' : 'Mulai sesi foto'}
                         </motion.button>
                     </motion.div>
                 )}
@@ -464,7 +469,7 @@ function QueueDisplay(): JSX.Element {
                             animate={{ y: 0, opacity: 1 }}
                             transition={{ delay: 0.1 }}
                         >
-                            SCAN QR INI DENGAN HP KAMU 📸
+                            SCAN QR INI DENGAN HP KAMU 
                         </motion.h2>
 
                         <motion.p
@@ -495,7 +500,7 @@ function QueueDisplay(): JSX.Element {
                             animate={{ opacity: 1 }}
                             transition={{ delay: 0.5 }}
                         >
-                            Lanjutkan Tanpa Scan →
+                            Lanjut tanpa scan
                         </motion.button>
                     </motion.div>
                 )}
@@ -512,7 +517,7 @@ function QueueDisplay(): JSX.Element {
                 title="Admin"
             >
                 <div className={styles.adminProgress} style={{ width: `${holdProgress}%` }} />
-                <span className={styles.adminGear}>⚙</span>
+                <span className={styles.adminGear}></span>
             </div>
 
             {/* ── Admin Modal ── */}

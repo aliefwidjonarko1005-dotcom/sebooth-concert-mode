@@ -149,6 +149,17 @@ export interface PageButtonIndicatorConfig {
 }
 
 // Config Types
+export type AmbientStyle = 'aurora' | 'shapes' | 'waves'
+
+export interface AmbientArtSettings {
+    enabled: boolean
+    style: AmbientStyle
+    colors: [string, string, string]
+    opacity: number      // 0..1 over the plain background
+    liveOpacity: number  // 0..1 over the live camera feed
+    speed: number        // 0.25..2
+}
+
 export interface AppConfig {
     countdownDuration: number // seconds
     previewDuration: number // seconds
@@ -212,6 +223,21 @@ export interface AppConfig {
     printClientEnabled: boolean   // true = this device sends print jobs to a remote print server
     printServerUrl: string        // URL of print server (e.g. "http://192.168.1.100:5050")
     deviceName: string            // Device identity name (e.g. "Booth A", "Booth B")
+
+    // Concert Mode: staff-operated fast flow (frame → capture → finalize → print), no payment/sharing screens
+    concertMode?: boolean
+    concertSessionSeconds?: number // one budget for capture + retake (default 240)
+    concertPrintQuantity?: number  // fixed strips per session (default 2 = 1 sheet)
+    boothCode?: string             // short code printed on pickup label, e.g. 'B2'
+    concertCounter?: number        // last used session number on this booth
+
+    // Abstract 2D gradient animation on the homepage (also overlays the live camera background)
+    landingArt?: AmbientArtSettings
+
+    // Right-edge legend for the 3 physical buttons (1 top, 2 middle, 3 bottom)
+    buttonRailEnabled?: boolean
+    mascotAssistant?: boolean // touch booth: tappable mascot that gives page tips + idle nudges (default off)
+    buttonRailPositions?: [number, number, number] // vertical centre of each button, % of screen height
 
     // Camera Preview Adjustments
     cameraZoom?: number // DSLR Live View zoom level (1.0 to 2.0)

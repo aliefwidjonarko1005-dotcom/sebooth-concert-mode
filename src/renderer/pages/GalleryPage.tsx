@@ -148,7 +148,7 @@ function GalleryPage(): JSX.Element {
                     ← Kembali
                 </button>
                 <div className={styles.error}>
-                    <span>📷</span>
+                    <span></span>
                     <h2>{error || 'Gallery not found'}</h2>
                     <p>This gallery may have expired or the link is invalid.</p>
                 </div>
@@ -177,7 +177,7 @@ function GalleryPage(): JSX.Element {
                 ← Kembali
             </button>
             <header className={styles.header}>
-                <h1>📸 Your Photos</h1>
+                <h1>Your Photos</h1>
                 <p className={styles.date}>
                     {new Date(gallery.createdAt).toLocaleDateString('id-ID', {
                         day: 'numeric',
@@ -195,7 +195,7 @@ function GalleryPage(): JSX.Element {
                         className={`${styles.tab} ${activeTab === 'strip' ? styles.active : ''}`}
                         onClick={() => setActiveTab('strip')}
                     >
-                        🖼️ Photo Strip
+                        Photo Strip
                     </button>
                 )}
                 {gallery.gif && (
@@ -203,7 +203,7 @@ function GalleryPage(): JSX.Element {
                         className={`${styles.tab} ${activeTab === 'gif' ? styles.active : ''}`}
                         onClick={() => setActiveTab('gif')}
                     >
-                        🎬 GIF
+                        GIF
                     </button>
                 )}
                 {gallery.livePhoto && (
@@ -211,7 +211,7 @@ function GalleryPage(): JSX.Element {
                         className={`${styles.tab} ${activeTab === 'live' ? styles.active : ''}`}
                         onClick={() => setActiveTab('live')}
                     >
-                        📱 Live Photo
+                        Live Photo
                     </button>
                 )}
                 {gallery.photos.length > 0 && (
@@ -219,7 +219,7 @@ function GalleryPage(): JSX.Element {
                         className={`${styles.tab} ${activeTab === 'photos' ? styles.active : ''}`}
                         onClick={() => setActiveTab('photos')}
                     >
-                        📷 Photos ({gallery.photos.length})
+                        Photos ({gallery.photos.length})
                     </button>
                 )}
             </nav>

@@ -1,0 +1,113 @@
+/* ─── Sebooth logo animation (ported from sebooth-website globals.css — keep in sync) ───
+   0.00s letters pop in one by one with an elastic bounce (S E B O O T H)
+   1.20s the O-O eyes glance left, right, then blink
+   2.20s the photo slides out of the slot like a tongue
+   2.60s PHOTOBOOTH drops into place; eyes keep looking around
+   Colours come from --sb-ink / --sb-accent. */
+.sb-loader { position: relative; display: flex; justify-content: center; }
+.sb-loader--block .sb-loader__svg { width: 100%; }
+.sb-loader__svg { height: auto; overflow: visible; fill: var(--sb-ink, #fe6b00); }
+.sb-loader-mini { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
+.sb-loader-mini__svg { width: 100%; height: 100%; fill: var(--sb-ink, currentColor); overflow: visible; }
+.sb-loader__pop {
+  transform-box: fill-box;
+  transform-origin: 50% 85%;
+  animation: sb-pop 0.75s linear both;
+}
+.sb-loader__blink {
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: sb-blink 3.6s ease-in-out 1.2s infinite;
+}
+.sb-loader__look { animation: sb-look 3.6s cubic-bezier(0.65, 0, 0.35, 1) 1.2s infinite; }
+.sb-loader-mini .sb-loader__blink { animation-duration: 2.4s; animation-delay: 0s; }
+.sb-loader-mini .sb-loader__look { animation-duration: 2.4s; animation-delay: 0s; }
+.sb-loader__paper {
+  transform-box: fill-box;
+  animation: sb-tongue 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) 2.2s both;
+}
+.sb-loader__label {
+  fill: var(--sb-accent, #fe6b00);
+  transform-box: fill-box;
+  animation: sb-label 0.6s cubic-bezier(0.16, 1, 0.3, 1) 2.6s both;
+}
+@keyframes sb-pop {
+  0% { opacity: 0; transform: scale(0); animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1); }
+  38% { opacity: 1; transform: scale(1.22); animation-timing-function: ease-in-out; }
+  58% { transform: scale(0.88); animation-timing-function: ease-in-out; }
+  74% { transform: scale(1.07); animation-timing-function: ease-in-out; }
+  88% { transform: scale(0.97); animation-timing-function: ease-out; }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes sb-look {
+  0%, 6% { transform: translateX(0); }
+  14%, 30% { transform: translateX(14px); }
+  40%, 56% { transform: translateX(-12px); }
+  66%, 100% { transform: translateX(0); }
+}
+@keyframes sb-blink {
+  0%, 68%, 76%, 100% { transform: scaleY(1); }
+  72% { transform: scaleY(0.08); }
+}
+@keyframes sb-tongue {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+@keyframes sb-label {
+  from { opacity: 0; transform: translateY(-60%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-loader__pop, .sb-loader__blink, .sb-loader__look, .sb-loader__paper,
+  .sb-loader__label { animation: none; }
+}
+
+/* ─── Shared cartoon stage behind every kiosk page (App.tsx renders .kiosk-art) ─── */
+.kiosk-art {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: var(--rail-w);
+  z-index: -1;
+  background: var(--brand-royal);
+  pointer-events: none;
+}
+/* Let the stage show through: page roots stop painting their own background */
+body.kiosk-art-on,
+body.kiosk-art-on #root { background: transparent !important; }
+
+/* Sticker surfaces pages can reuse */
+.sticker {
+  background: #FFFFFF;
+  color: var(--brand-ink);
+  border: var(--ink-line);
+  border-radius: var(--sticker-radius);
+  box-shadow: var(--sticker-shadow);
+}
+
+/* ─── Kiosk poster theme (royal blue). Pages opt in with class "kiosk". ─── */
+.kiosk {
+  background: var(--brand-royal);
+  color: #FFFFFF;
+}
+.kiosk h1, .kiosk h2, .kiosk p { color: inherit; }
+.kiosk-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+  color: #FFFFFF;
+  /* cartoon drop: hard ink offset, no blur */
+  text-shadow: 0.045em 0.055em 0 var(--brand-ink);
+}
+.kiosk-title em {
+  font-style: normal;
+}
+/* Bayon draws 1 like an I, so digits inside titles use the text face */
+.kiosk-num {
+  font-family: var(--font-family);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}

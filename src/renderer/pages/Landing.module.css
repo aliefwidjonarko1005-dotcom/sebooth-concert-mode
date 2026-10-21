@@ -1,14 +1,15 @@
 /* ============================================================
-   LANDING PAGE — Hero Layout
-   Reference: Myna UI style — white bg, top navbar, big hero
+   LANDING — royal-blue poster: animated Sebooth wordmark + "press 3" cue.
+   Operator controls (camera, live-cam toggle, admin) stay small in the top bar.
    ============================================================ */
 
 .container {
-    width: 100vw;
+    width: 100%;
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background: #F6F6F6;
+    background: transparent;
+    color: #FFFFFF;
     overflow: hidden;
     position: relative;
     font-family: var(--font-family);
@@ -17,14 +18,10 @@
 .container.hasLiveCam,
 .container.hasCustomBg {
     background: none !important;
-    background-color: transparent !important;
-    background-image: none !important;
 }
 
-/* ── LIVE CAMERA BACKGROUND ── */
+/* ── LIVE CAMERA BACKGROUND ── (sizing is inline in Landing.tsx to handle rotation) */
 .liveCameraBackground {
-    /* Position & sizing are set via inline styles in Landing.tsx
-       to handle camera rotation properly — do NOT add !important here */
     position: fixed;
     top: 0;
     left: 0;
@@ -34,97 +31,63 @@
     z-index: 1 !important;
     display: block !important;
     background: #000000 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
 }
 
 /* ── CUSTOM BACKGROUND ── */
 .customBackground {
     position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
+    inset: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
     object-fit: cover;
     z-index: 1 !important;
     display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
 }
 
-/* Overlay untuk membuat content terlihat di atas live camera */
+/* Navy scrim so the logo and cue stay readable over camera / custom backgrounds */
 .container::before {
     content: '';
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.35);
-    z-index: 9999;
+    inset: 0;
+    background: rgba(0, 17, 58, 0.55);
+    z-index: 2;
     pointer-events: none;
     opacity: 0;
-    transition: opacity 0.3s ease;
 }
 
 .container.hasLiveCam::before,
 .container.hasCustomBg::before {
-    opacity: 0.4;
-    z-index: 2;
+    opacity: 1;
 }
 
-.container.hasLiveCam .illustrationWrap,
-.container.hasCustomBg .illustrationWrap {
-    display: none !important;
+/* Abstract animation layer: above the scrim (z 2), below the logo and cue (z 10).
+   The radial mask keeps the centre clear so the logo, and faces on the live camera, stay clean. */
+.artLayer {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    -webkit-mask-image: radial-gradient(ellipse 42% 30% at 50% 48%, transparent 35%, #000 100%);
+    mask-image: radial-gradient(ellipse 42% 30% at 50% 48%, transparent 35%, #000 100%);
 }
 
-/* ── TOP NAVBAR ── */
+/* ── TOP BAR (operator only) ── */
 .navbar {
     position: relative;
-    z-index: 99999;
+    z-index: 20;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 20px 48px;
-    background: transparent;
+    padding: 20px 32px;
     flex-shrink: 0;
+    opacity: 0.55;
 }
 
-.navLeft {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-.navLogo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.navLogoIcon {
-    width: 42px;
-    height: 42px;
-    object-fit: contain;
-}
-
-.navLogoText {
-    font-size: 24px;
-    font-weight: 900;
-    color: #1A1A2E;
-    letter-spacing: -0.02em;
-}
-
+.navLeft,
 .navRight {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
 }
 
 /* Camera Picker pill */
@@ -139,19 +102,17 @@
     padding: 12px 24px;
     font-size: 15px;
     font-weight: 700;
-    color: #1A1A2E;
+    color: var(--brand-ink);
     background: #FFFFFF;
-    border: 1px solid rgba(0, 0, 0, 0.05);
+    border: 3px solid var(--brand-ink);
     border-radius: var(--radius-full);
-    box-shadow: var(--clay-shadow-sm);
     cursor: pointer;
     transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     white-space: nowrap;
 }
 
 .cameraPickerBtn:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: var(--clay-shadow);
+    transform: translateY(-3px);
 }
 
 .cameraPickerBtn:active {
@@ -170,8 +131,9 @@
     top: calc(100% + 8px);
     right: 0;
     background: #FFFFFF;
-    border-radius: var(--radius-xl);
-    box-shadow: var(--clay-shadow-lg);
+    border: var(--ink-line);
+    border-radius: 20px;
+    box-shadow: var(--sticker-shadow);
     min-width: 220px;
     overflow: hidden;
     z-index: 100;
@@ -270,283 +232,111 @@
 }
 
 /* ── HERO SECTION ── */
+
+/* ── HERO ── */
 .hero {
     position: relative;
-    z-index: 60;
-    /* Higher than illustration wrap */
+    z-index: 10;
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: 28px;
+    padding: 0 48px 72px;
     text-align: center;
-    padding: 32px 48px 0;
-    flex-shrink: 0;
+}
+
+.heroLogo {
+    width: min(62%, 860px);
 }
 
 .headline {
-    font-size: clamp(36px, 5.5vw, 68px);
-    font-weight: 900;
-    line-height: 1.1;
-    color: #1A1A2E;
-    letter-spacing: -0.03em;
-    margin-bottom: 24px;
-
-    /* Liquid Glass Effect */
-    padding: 24px 48px;
-    background: rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(8px) saturate(140%);
-    -webkit-backdrop-filter: blur(12px) saturate(140%);
-    border-radius: 40px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow:
-        0 12px 32px rgba(0, 0, 0, 0.08),
-        inset 0 1px 2px rgba(255, 255, 255, 0.5);
-
-    display: inline-block;
-    /* Wrap tight around text padding */
-    max-width: 90%;
+    font-size: 132px;
+    margin-top: -8px;
 }
 
-.headlineAccent {
-    color: var(--clay-green);
-}
-
-.subtitle {
-    font-size: clamp(14px, 1.4vw, 18px);
-    color: #6B7280;
-    font-weight: 500;
-    line-height: 1.6;
-    max-width: 520px;
-    margin-bottom: 32px;
-}
-
-/* CTA Buttons Row */
-.ctaRow {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-
-/* Primary — dark navy pill */
 .ctaPrimary {
-    position: absolute;
-    top: 53%;
-    /* Slightly below center to balance the layout */
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 16px;
-    padding: 24px 72px;
-    font-size: 28px;
-    font-weight: 900;
-    color: #FFFFFF;
-
-    /* Liquid Glass Base */
-    background: rgba(132, 132, 144, 0.3);
-    backdrop-filter: blur(10px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    gap: 18px;
+    padding: 18px 40px;
     border-radius: var(--radius-full);
-
-    /* Layered Glint/Inner Glow */
-    box-shadow:
-        0 24px 60px rgba(0, 0, 0, 0.3),
-        inset 0 1px 1px rgba(255, 255, 255, 0.5),
-        inset 0 -1px 1px rgba(0, 0, 0, 0.2);
-
-    cursor: pointer;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    white-space: nowrap;
-    z-index: 150;
-    overflow: hidden;
-}
-
-/* Shine effect pseudo-element */
-.ctaPrimary::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -150%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg,
-            transparent,
-            rgba(255, 255, 255, 0.2),
-            transparent);
-    transform: skewX(-25deg);
-    transition: 0.5s;
-    pointer-events: none;
-}
-
-.ctaPrimary:hover::before {
-    left: 150%;
-    transition: 0.8s;
-}
-
-.ctaPrimary:hover {
-    transform: translate(-50%, -55%) scale(1.05);
-    background: rgba(162, 162, 167, 0.85);
-    box-shadow:
-        0 30px 60px rgba(0, 0, 0, 0.45),
-        inset 0 1px 2px rgba(255, 255, 255, 0.5);
-}
-
-.ctaPrimary:active {
-    transform: translate(-50%, -48%) scale(0.95);
-    background: rgba(26, 26, 46, 0.95);
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    font-size: 30px;
+    font-weight: 800;
+    border: 5px solid var(--brand-ink);
+    box-shadow: 0 10px 0 var(--brand-ink);
+    animation: cue 2.4s ease-in-out infinite;
 }
 
 .ctaPrimary:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: translate(-50%, -50%);
+    animation: none;
 }
 
-/* Secondary — white/cream pill */
-.ctaSecondary {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 16px 28px;
-    font-size: 15px;
-    font-weight: 700;
-    color: #1A1A2E;
-    background: #F5F0EB;
-    border: none;
-    border-radius: var(--radius-full);
-    box-shadow: var(--clay-shadow-sm);
-    cursor: pointer;
-    transition: all var(--transition-bouncy);
-    white-space: nowrap;
-}
-
-.ctaSecondary:hover {
-    transform: translateY(-4px) scale(1.02);
-    box-shadow: var(--clay-shadow);
-}
-
-.ctaSecondary:active {
-    transform: scale(0.94);
-}
-
-/* Loader spinner inside primary btn */
-.loader {
-    width: 20px;
-    height: 20px;
-    border: 3px solid rgba(255, 255, 255, 0.3);
-    border-top-color: #FFFFFF;
+.ctaKey {
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-}
-
-/* ── ILLUSTRATION AREA ── */
-.illustrationWrap {
-    flex: 1;
-    position: relative;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    overflow: hidden;
-    min-height: 0;
-    margin-top: -200px;
-    /* Pull significantly higher to overlap hero */
-    z-index: 10;
-    /* illustration behind but hero elements should be higher if needed */
-}
-
-.illustration {
-    width: 100%;
-    height: 100%;
-    max-width: 1200px;
-    /* Limit max size for ultra-wide screens */
-    object-fit: contain;
-    object-position: top center;
-    display: block;
-    transform: scale(1.35);
-    /* Scale up to match reference prominent look */
-    transform-origin: top center;
-}
-
-/* Placeholder when image missing */
-.illustrationPlaceholder {
-    display: flex;
-    flex-direction: column;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 20px;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(to top, #F5F0EB 0%, #FFFFFF 100%);
-    text-align: center;
-    padding: 40px;
+    background: var(--brand-orange);
+    border: 4px solid var(--brand-ink);
+    color: #FFFFFF;
+    font-size: 34px;
+    font-weight: 900;
 }
 
-.illustrationPlaceholder p {
-    font-size: 15px;
-    color: #9CA3AF;
-    font-weight: 600;
-    line-height: 1.6;
+.ctaLoader {
+    width: 72px;
+    height: 48px;
+    color: var(--brand-royal);
 }
 
-.illustrationPlaceholder code {
-    display: inline-block;
-    margin-top: 8px;
-    background: #F5F0EB;
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    color: var(--clay-blue);
-}
-
-/* ── GRADIENT fade bottom to top on bg ── */
-.container::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 120px;
-    background: linear-gradient(to top, rgba(255, 255, 255, 0.6), transparent);
-    pointer-events: none;
-    z-index: 5;
+@keyframes cue {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
 }
 
 /* ── ADMIN MODAL ── */
 .modalOverlay {
     position: fixed;
-    inset: 0;
-    background: rgba(26, 26, 46, 0.55);
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: var(--rail-w); /* stop at the button rail */
+    background: rgba(0, 17, 58, 0.6);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 200;
-    backdrop-filter: blur(10px);
 }
 
 .modal {
     background: #FFFFFF;
-    border-radius: var(--radius-2xl);
-    padding: var(--spacing-2xl);
-    min-width: 340px;
+    color: var(--brand-ink);
+    border: 5px solid var(--brand-ink);
+    border-radius: var(--sticker-radius);
+    padding: 40px;
+    min-width: 380px;
     text-align: center;
-    box-shadow: var(--clay-shadow-xl);
+    box-shadow: 10px 12px 0 var(--brand-ink);
 }
 
 .modal h3 {
-    margin-bottom: var(--spacing-lg);
-    font-size: var(--font-size-xl);
-    font-weight: 900;
-    color: #1A1A2E;
+    margin-bottom: 12px;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 40px;
+    color: var(--brand-ink);
 }
 
 .modal form {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    gap: 12px;
 }
 
 .passwordInput {
@@ -554,216 +344,74 @@
     padding: 14px 20px;
     font-size: 16px;
     text-align: center;
-    background: #F5F0EB;
-    border: 2px solid transparent;
-    border-radius: var(--radius-full);
-    color: #1A1A2E;
-    box-shadow: var(--clay-shadow-sm);
-    outline: none;
+    background: var(--brand-light);
+    border: 3px solid var(--brand-ink);
+    border-radius: 14px;
+    color: var(--brand-ink);
+    box-shadow: none;
     font-weight: 700;
-    transition: all var(--transition-fast);
 }
 
 .passwordInput:focus {
-    border-color: var(--clay-blue);
+    border-color: var(--brand-royal);
+    box-shadow: none;
 }
 
 .passwordInput.error {
     animation: shake 0.4s ease;
-    border-color: var(--clay-coral);
+    border-color: var(--brand-orange);
 }
 
 .submitButton {
-    padding: 14px;
+    padding: 12px;
     font-size: 16px;
-    font-weight: 900;
+    font-weight: 800;
     color: #FFFFFF;
-    background: #1A1A2E;
-    border: none;
-    border-radius: var(--radius-full);
-    cursor: pointer;
-    box-shadow: 0 8px 24px rgba(26, 26, 46, 0.28);
-    transition: all var(--transition-bouncy);
+    background: var(--brand-orange);
+    border: 3px solid var(--brand-ink);
+    border-radius: 14px;
 }
 
-.submitButton:hover {
-    transform: translateY(-3px) scale(1.02);
-}
-
-.submitButton:active {
-    transform: scale(0.94);
-}
-
-/* Version watermark */
 .version {
     position: absolute;
     bottom: 12px;
     right: 16px;
     font-size: 11px;
-    color: rgba(0, 0, 0, 0.2);
+    color: rgba(255, 255, 255, 0.35);
     font-weight: 600;
-    z-index: 50;
+    z-index: 20;
 }
 
-/* ── LIVE CAMERA TOGGLE BUTTON ── */
+/* ── LIVE CAMERA TOGGLE ── */
 .liveCameraToggle {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    border: 1.5px solid rgba(255, 255, 255, 0.3);
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.3);
     color: #FFFFFF;
     flex-shrink: 0;
 }
 
-.liveCameraToggle:hover {
-    background: rgba(255, 255, 255, 0.25);
-    transform: scale(1.05);
-}
-
-.liveCameraToggle:active {
-    transform: scale(0.92);
-}
-
 .liveCameraToggle.active {
-    background: rgba(62, 193, 138, 0.5);
-    border-color: var(--clay-green);
-    box-shadow: 0 0 16px rgba(62, 193, 138, 0.4);
-}
-
-.toggleIcon {
-    font-size: 22px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* Animations */
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    background: var(--brand-orange);
+    border-color: var(--brand-orange);
 }
 
 @keyframes shake {
-
-    0%,
-    100% {
-        transform: translateX(0);
-    }
-
-    25% {
-        transform: translateX(-8px);
-    }
-
-    75% {
-        transform: translateX(8px);
-    }
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
 }
 
-/* ── PORTRAIT MODE OVERRIDES ── */
-:global(body.app-portrait) .container {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100vh !important;
-}
-
-:global(body.app-portrait) .navbar {
-    padding: 16px 20px !important;
-    gap: 8px !important;
-}
-
-:global(body.app-portrait) .navLeft {
-    gap: 10px !important;
-}
-
-:global(body.app-portrait) .navLogoText {
-    font-size: 20px !important;
-}
-
-:global(body.app-portrait) .navLogoIcon {
-    width: 36px !important;
-    height: 36px !important;
-}
-
-:global(body.app-portrait) .liveCameraToggle {
-    width: 40px !important;
-    height: 40px !important;
-}
-
-:global(body.app-portrait) .navRight {
-    gap: 10px !important;
-}
-
-:global(body.app-portrait) .cameraPickerBtn {
-    padding: 10px 16px !important;
-    font-size: 13px !important;
-    max-width: 180px !important;
-    display: flex !important;
-    align-items: center !important;
-}
-
-:global(body.app-portrait) .cameraPickerBtn span:nth-child(2) {
-    max-width: 100px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-}
-
-:global(body.app-portrait) .adminTrigger {
-    width: 36px !important;
-    height: 36px !important;
-}
-
-:global(body.app-portrait) .hero {
-    padding: 24px 24px 0 !important;
-}
-
-:global(body.app-portrait) .headline {
-    font-size: clamp(28px, 5vh, 48px) !important;
-    padding: 20px 28px !important;
-    max-width: 95% !important;
-    margin-bottom: 20px !important;
-}
-
-:global(body.app-portrait) .illustrationWrap {
-    margin-top: -80px !important;
-    max-height: 50vh !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
-
-:global(body.app-portrait) .illustration {
-    transform: scale(1.1) !important;
-    max-height: 45vh !important;
-}
-
-:global(body.app-portrait) .ctaPrimary {
-    padding: 20px 56px !important;
-    font-size: 24px !important;
-    top: 50% !important;
-}
-
-:global(body.app-portrait) .liveCameraBackground {
-    /* All positioning handled by inline styles in Landing.tsx */
-    overflow: hidden !important;
-}
-
-:global(body.app-portrait) .customBackground,
-:global(body.app-portrait) .container::before,
-:global(body.app-portrait) .modalOverlay {
-    position: absolute !important;
-    width: 100% !important;
-    height: 100% !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-}
+/* ── PORTRAIT ── */
+:global(body.app-portrait) .hero { gap: 40px; padding: 0 32px 120px; }
+:global(body.app-portrait) .heroLogo { width: 96%; }
+:global(body.app-portrait) .headline { font-size: 120px; line-height: 0.9; }
+:global(body.app-portrait) .ctaPrimary { font-size: 26px; padding: 16px 30px; gap: 14px; }
+:global(body.app-portrait) .ctaKey { width: 54px; height: 54px; font-size: 30px; }
+:global(body.app-portrait) .navbar { padding: 16px 20px; }
+:global(body.app-portrait) .cameraPickerBtn span:nth-child(2) { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

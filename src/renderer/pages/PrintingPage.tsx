@@ -4,21 +4,34 @@ import { motion } from 'framer-motion'
 import { useSessionStore, useAppConfig, useQueueStore } from '../stores'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './PrintingPage.module.css'
-// Note: You must place 'printing_animation.mov' (or .mp4) in the src/renderer/assets folder 
-// or update this path to the correct asset later.
-// We'll use a placeholder variable for now.
-import PrintingAnimation from '../assets/printing_animation.mp4'
+import { SeboothLogo } from '../components/brand/SeboothLogo'
 
 function PrintingPage(): JSX.Element {
     const navigate = useNavigate()
     const location = useLocation()
-    const { currentSession, endSession } = useSessionStore()
+    const { currentSession, endSession, pickupLabel } = useSessionStore()
     const { config } = useAppConfig()
     const { activeTicketNumber, reset: resetQueue } = useQueueStore()
     
     const getHomeRoute = () => (config.queueEnabled && config.queueEventId) ? '/queue' : '/'
     
-    const sendSessionCompletedAndGoHome = async () => {
+    const [showPickup, setShowPickup] = useState(false)
+    const [printDeferred, setPrintDeferred] = useState(false)
+
+    const sendSessionCompletedAndGoHome = async (printed = true) => {
+        // Concert mode: tell the customer where to pick up, then free the booth for the next person.
+        // No pickup code when the strip never reached a print queue — the error stays up so staff can step in.
+        if (config.concertMode) {
+            if (printed) {
+                setPrintCompleted(true)
+                setShowPickup(true)
+            }
+            setTimeout(() => {
+                endSession()
+                navigate('/')
+            }, printed ? 6000 : 10000)
+            return
+        }
         // Send session_completed webhook if in queue mode
         if (config.queueEnabled && config.queueEventId && activeTicketNumber) {
             try {
@@ -86,9 +99,9 @@ function PrintingPage(): JSX.Element {
         // Check if printing is enabled
         if (!config.printerEnabled) {
             console.log('[PrintingPage] Printing is disabled, skipping...')
-            setError('Printing is disabled in settings')
+            setError('Pencetakan dimatikan di pengaturan')
             setTimeout(() => {
-                sendSessionCompletedAndGoHome()
+                sendSessionCompletedAndGoHome(false)
             }, 3000)
             return
         }
@@ -96,9 +109,9 @@ function PrintingPage(): JSX.Element {
         // Check if printer is selected (only needed for local print mode)
         if (!config.printClientEnabled && !config.printerName) {
             console.log('[PrintingPage] No printer selected, skipping...')
-            setError('No printer selected in settings')
+            setError('Printer belum dipilih di pengaturan')
             setTimeout(() => {
-                sendSessionCompletedAndGoHome()
+                sendSessionCompletedAndGoHome(false)
             }, 3000)
             return
         }
@@ -107,9 +120,9 @@ function PrintingPage(): JSX.Element {
             const compositeDataUrl = currentSession?.compositePath
 
             if (!compositeDataUrl) {
-                setError('Failed to find composite image for printing')
+                setError('Gambar strip tidak ditemukan untuk dicetak')
                 setTimeout(() => {
-                    sendSessionCompletedAndGoHome()
+                    sendSessionCompletedAndGoHome(false)
                 }, 5000)
                 return
             }
@@ -124,7 +137,8 @@ function PrintingPage(): JSX.Element {
                 const result = await (window as any).api.printer.remotePrint({
                     imageData: compositeDataUrl,
                     copies,
-                    sessionId: currentSession!.id
+                    sessionId: currentSession!.id,
+                    label: pickupLabel || undefined
                 })
 
                 console.log('[PrintingPage] Remote print result:', result)
@@ -132,10 +146,11 @@ function PrintingPage(): JSX.Element {
                 if (!result.success) {
                     setError(result.error || 'Remote print failed — check connection to Print Server')
                     setTimeout(() => {
-                        sendSessionCompletedAndGoHome()
+                        sendSessionCompletedAndGoHome(false)
                     }, 5000)
                 } else {
                     setPrintCompleted(true)
+                    if (result.data?.queued) setPrintDeferred(true)
                     sendSessionCompletedAndGoHome()
                 }
                 return
@@ -177,7 +192,7 @@ function PrintingPage(): JSX.Element {
             console.log('[PrintingPage] Print result:', result)
             
             if (!result.success) {
-                setError(result.error || 'Print failed')
+                setError(result.error || 'Gagal mencetak')
                 // If print fails, wait a bit so user can read the error, then go home
                 setTimeout(() => {
                     endSession()
@@ -189,9 +204,9 @@ function PrintingPage(): JSX.Element {
                 sendSessionCompletedAndGoHome()
             }
         } catch (err) {
-            setError('Print failed: ' + (err as Error).message)
+            setError('Gagal mencetak: ' + (err as Error).message)
             setTimeout(() => {
-                sendSessionCompletedAndGoHome()
+                sendSessionCompletedAndGoHome(false)
             }, 5000)
         }
     }
@@ -201,7 +216,7 @@ function PrintingPage(): JSX.Element {
     }
 
     const handleConfirmBackHome = () => {
-        sendSessionCompletedAndGoHome()
+        sendSessionCompletedAndGoHome(printCompleted)
     }
 
     return (
@@ -211,33 +226,30 @@ function PrintingPage(): JSX.Element {
                 onClose={() => setIsConfirmModalOpen(false)}
                 onConfirm={handleConfirmBackHome}
             />
-            {/* 
-                We use an HTML5 video tag. 
-                autoPlay, loop, muted ensures it plays automatically in the background 
-            */}
-            <video 
-                className={styles.videoBackground}
-                autoPlay 
-                loop 
-                muted 
-                playsInline
-                // Fallback gracefully if asset is missing during dev
-                onError={(e) => console.log('Video error:', e)}
-            >
-                <source src={PrintingAnimation} type="video/mp4" />
-                {/* Add .mov support if needed */}
-                {/* <source src={PrintingAnimationMov} type="video/quicktime" /> */}
-            </video>
 
-            <div className={styles.overlay}></div>
+            {error && <div className={styles.errorMessage}>{error}{config.concertMode && !printCompleted && ' — Cetakan tidak terkirim, panggil petugas booth.'}</div>}
 
-            {error && <div className={styles.errorMessage}>{error}</div>}
-
-            <div className={styles.content}>
-                <h1 className={styles.title}>Printing Your Memories</h1>
-                <p className={styles.subtitle}>Please wait a moment while your photos are being printed...</p>
-                <div className={styles.loadingSpinner}></div>
-            </div>
+            {showPickup ? (
+                <div className={styles.content}>
+                    <h1 className={`kiosk-title ${styles.title}`}>Ambil fotomu<br /><em>di loket</em></h1>
+                    {pickupLabel && (
+                        <>
+                            <p className={styles.subtitle}>Sebutkan kode ini ke petugas loket</p>
+                            <div className={styles.pickupCode}>{pickupLabel}</div>
+                        </>
+                    )}
+                    {printDeferred && (
+                        <p className={styles.pickupWarning}>Printer loket sedang tidak terhubung. Cetakan dikirim otomatis begitu tersambung.</p>
+                    )}
+                </div>
+            ) : (
+                <div className={styles.content}>
+                    {/* The wordmark's paper sliding out of the slot doubles as the printing animation */}
+                    <SeboothLogo theme="royal" ink="#ffffff" accent="#fe6b00" className={styles.logo} />
+                    <h1 className={`kiosk-title ${styles.title}`}>Sedang <em>mencetak</em></h1>
+                    <p className={styles.subtitle}>Sebentar ya, strip kamu sedang dikirim ke printer.</p>
+                </div>
+            )}
         </div>
     )
 }

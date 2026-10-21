@@ -7,15 +7,16 @@ import { v4 as uuidv4 } from 'uuid'
 import { apiHelper } from '../lib/apiHelper'
 import { getSessionHistory, SessionHistoryItem, getSupabase } from '../lib/supabase'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
-import { PhysicalButtonIndicator } from '../components/PhysicalButtonIndicator'
 import styles from './AdminDashboard.module.css'
+import { SeboothLogo } from '../components/brand/SeboothLogo'
+import { AmbientArt, AMBIENT_PALETTES, DEFAULT_AMBIENT_ART } from '../components/brand/AmbientArt'
 
 type DragMode = 'move' | 'resize-se' | 'resize-sw' | 'resize-ne' | 'resize-nw' | 'rotate' | null
 
 function AdminDashboard(): JSX.Element {
     const navigate = useNavigate()
     const { frames, addFrame, updateFrame, deleteFrame, addSlot, updateSlot, deleteSlot, addQRSlot, updateQRSlot, deleteQRSlot, setActiveFrame, undo, redo } = useFrameStore()
-    const { config, updateConfig, setIsLayoutEditMode } = useAppConfig()
+    const { config, updateConfig } = useAppConfig()
     const { filters, addFilter, removeFilter } = useFilterStore()
     const { endSession } = useSessionStore()
 
@@ -61,7 +62,6 @@ function AdminDashboard(): JSX.Element {
     const indicatorCanvasRef = useRef<HTMLDivElement>(null)
 
     // Button Indicator Editor State & Guidelines
-    const [indicatorPreviewPage, setIndicatorPreviewPage] = useState<'landing' | 'frames' | 'payment' | 'capture' | 'review' | 'sharing' | 'printing'>('landing')
     const [showGridLines, setShowGridLines] = useState(true)
     const [showCenterLines, setShowCenterLines] = useState(true)
     const [showMarginGuides, setShowMarginGuides] = useState(true)
@@ -787,10 +787,13 @@ function AdminDashboard(): JSX.Element {
                 <button className={styles.backButton} onClick={() => setIsConfirmModalOpen(true)}>
                     ← Back
                 </button>
-                <h1>Admin Dashboard</h1>
+                <h1 className={styles.brandTitle}>
+                    <SeboothLogo variant="mini" className={styles.brandMark} label="Sebooth" />
+                    Sebooth Admin
+                </h1>
                 <div className={styles.headerActions}>
                     <span style={{ fontSize: '14px', color: '#10b981', marginRight: '15px', fontWeight: 'bold' }}>
-                        ✅ Settings Auto-Save Enabled
+                        Tersimpan otomatis
                     </span>
                 </div>
             </header>
@@ -801,61 +804,61 @@ function AdminDashboard(): JSX.Element {
                     className={`${styles.tab} ${activeTab === 'frames' ? styles.active : ''}`}
                     onClick={() => setActiveTab('frames')}
                 >
-                    🖼️ Frames
+                    Frames
                 </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'timers' ? styles.active : ''}`}
                     onClick={() => setActiveTab('timers')}
                 >
-                    ⏱️ Timers
+                    Timers
                 </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'filters' ? styles.active : ''}`}
                     onClick={() => setActiveTab('filters')}
                 >
-                    🎨 Filters
+                    Filters
                 </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'payment' ? styles.active : ''}`}
                     onClick={() => setActiveTab('payment')}
                 >
-                    💳 Payment
+                    Payment
                 </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'history' ? styles.active : ''}`}
                     onClick={() => setActiveTab('history')}
                 >
-                    📋 History
+                    History
                 </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'sharing' ? styles.active : ''}`}
                     onClick={() => setActiveTab('sharing')}
                 >
-                    📡 Sharing
+                    Sharing
                 </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'printers' ? styles.active : ''}`}
                     onClick={() => setActiveTab('printers')}
                 >
-                    🖨️ Printers
+                    Printers
                 </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'queue' ? styles.active : ''}`}
                     onClick={() => setActiveTab('queue')}
                 >
-                    ☁️ Cloud Queue
+                    Cloud Queue
                 </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'webhook' ? styles.active : ''}`}
                     onClick={() => setActiveTab('webhook')}
                 >
-                    🔗 Queue Integration
+                    Queue Integration
                 </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'button-indicator' ? styles.active : ''}`}
                     onClick={() => setActiveTab('button-indicator')}
                 >
-                    🔘 Penunjuk Tombol
+                    Tombol Fisik
                 </button>
             </nav>
 
@@ -883,7 +886,15 @@ function AdminDashboard(): JSX.Element {
                                             <img src={`file://${frame.overlayPath}`} alt={frame.name} />
                                         </div>
                                         <div className={styles.frameInfo}>
-                                            <span className={styles.frameName}>{frame.name}</span>
+                                            <span className={styles.frameName}>
+                                                {(() => {
+                                                    // Same numbering as the customer FrameSelection carousel
+                                                    const shown = config.activeFrameIds.length > 0 ? frames.filter(f => config.activeFrameIds.includes(f.id)) : frames
+                                                    const n = shown.findIndex(f => f.id === frame.id)
+                                                    return n >= 0 ? `#${n + 1} · ` : ''
+                                                })()}
+                                                {frame.name}
+                                            </span>
                                             <span className={styles.frameSlots}>{frame.slots.length} slots</span>
                                         </div>
                                         {config.activeFrameIds.includes(frame.id) && (
@@ -946,7 +957,7 @@ function AdminDashboard(): JSX.Element {
                                         </button>
                                         {selectedFrame.slots.length > 0 && (
                                             <button className={styles.clearSlotsButton} onClick={handleClearAllSlots}>
-                                                🗑️ Clear All
+                                                Clear All
                                             </button>
                                         )}
                                     </div>
@@ -1052,7 +1063,7 @@ function AdminDashboard(): JSX.Element {
                                                         }}
                                                         onMouseDown={(e) => handleQRSlotMouseDown(slot.id, e)}
                                                     >
-                                                        <span className={styles.slotNumber} style={{ fontSize: '14px', color: '#3b82f6' }}>{slotLabel}</span>
+                                                        <span className={styles.slotNumber} style={{ fontSize: '14px', color: '#fe6b00' }}>{slotLabel}</span>
                                                         
                                                         {slot.id !== 'legacy-qr' && (
                                                             <button
@@ -1102,14 +1113,14 @@ function AdminDashboard(): JSX.Element {
                         {selectedFrame && (
                             <aside className={styles.slotSidebar}>
                                 <div className={styles.sidebarHeader}>
-                                    <h3>📁 Photo Slots</h3>
+                                    <h3>Photo Slots</h3>
                                     <span className={styles.slotCount}>{selectedFrame.slots.length} slots</span>
                                 </div>
                                 <div className={styles.slotListSidebar}>
                                     {/* QR Code Box settings */}
                                     <div className={styles.qrSlotSection}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                            <h4 style={{ margin: 0, fontSize: '14px', color: 'white' }}>🔗 QR Code Slots</h4>
+                                            <h4 style={{ margin: 0, fontSize: '14px', color: 'white' }}>QR Code Slots</h4>
                                             <button 
                                                 className={styles.addButton}
                                                 style={{ padding: '2px 8px', fontSize: '12px' }}
@@ -1129,8 +1140,8 @@ function AdminDashboard(): JSX.Element {
                                                     style={{ marginTop: '5px' }}
                                                 >
                                                     <div className={styles.slotItemHeader}>
-                                                        <span className={styles.slotIcon}>🔗</span>
-                                                        <span className={styles.slotLabel} style={{ color: '#3b82f6' }}>{slotLabel}</span>
+                                                        <span className={styles.slotIcon}></span>
+                                                        <span className={styles.slotLabel} style={{ color: '#fe6b00' }}>{slotLabel}</span>
                                                         <span className={styles.slotDimensions}>
                                                             {Math.round(slot.width)}×{Math.round(slot.height)}
                                                         </span>
@@ -1246,7 +1257,7 @@ function AdminDashboard(): JSX.Element {
                                             onClick={() => setSelectedSlotId(selectedSlotId === slot.id ? null : slot.id)}
                                         >
                                             <div className={styles.slotItemHeader}>
-                                                <span className={styles.slotIcon}>{selectedSlotId === slot.id ? '📂' : '📁'}</span>
+                                                <span className={styles.slotIcon}>{selectedSlotId === slot.id ? '' : ''}</span>
                                                 <span className={styles.slotLabel}>Slot {getSlotDisplayNumber(slot, index)}</span>
                                                 <span className={styles.slotDimensions}>{Math.round(slot.width)}×{Math.round(slot.height)}</span>
                                             </div>
@@ -1328,7 +1339,7 @@ function AdminDashboard(): JSX.Element {
                                                             setSelectedSlotId(null)
                                                         }}
                                                     >
-                                                        🗑️ Delete Slot
+                                                        Delete Slot
                                                     </button>
                                                 </div>
                                             )}
@@ -1351,7 +1362,156 @@ function AdminDashboard(): JSX.Element {
                     activeTab === 'timers' && (
                         <div className={styles.timersTab}>
                             <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                                <h3>📐 App Layout Orientation</h3>
+                                <h3>Concert Mode</h3>
+                                <p>Alur cepat untuk event ramai: Frame (dipilih petugas sesuai nomor) → Foto + Retake dalam 1 jatah waktu → Preview + Mirror → Cetak. Tanpa halaman pembayaran, filter, dan sharing. Upload berjalan di background.</p>
+                                <div className={styles.timerToggle}>
+                                    <label className={styles.toggleSwitch}>
+                                        <input
+                                            type="checkbox"
+                                            checked={config.concertMode || false}
+                                            onChange={(e) => updateConfig({ concertMode: e.target.checked })}
+                                        />
+                                        <span className={styles.toggleSlider}></span>
+                                    </label>
+                                    <span className={styles.toggleLabel}>
+                                        {config.concertMode ? 'Concert Mode Aktif' : 'Concert Mode Nonaktif'}
+                                    </span>
+                                </div>
+                                {config.concertMode && (
+                                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '16px', color: 'white' }}>
+                                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontWeight: 700 }}>
+                                            Jatah waktu foto + retake (detik)
+                                            <input
+                                                type="number"
+                                                min={60}
+                                                max={900}
+                                                value={config.concertSessionSeconds ?? 240}
+                                                onChange={(e) => updateConfig({ concertSessionSeconds: Math.max(60, Number(e.target.value) || 240) })}
+                                                style={{ width: '160px', padding: '10px 14px', fontSize: '14px', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg-tertiary)', color: 'white' }}
+                                            />
+                                        </label>
+                                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontWeight: 700 }}>
+                                            Jumlah strip per sesi (kelipatan 2)
+                                            <input
+                                                type="number"
+                                                min={2}
+                                                step={2}
+                                                value={config.concertPrintQuantity ?? 2}
+                                                onChange={(e) => updateConfig({ concertPrintQuantity: Math.max(2, Number(e.target.value) || 2) })}
+                                                style={{ width: '160px', padding: '10px 14px', fontSize: '14px', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg-tertiary)', color: 'white' }}
+                                            />
+                                        </label>
+                                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontWeight: 700 }}>
+                                            Kode booth (label loket)
+                                            <input
+                                                type="text"
+                                                maxLength={4}
+                                                value={config.boothCode ?? 'B1'}
+                                                onChange={(e) => updateConfig({ boothCode: e.target.value.toUpperCase() })}
+                                                style={{ width: '160px', padding: '10px 14px', fontSize: '14px', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg-tertiary)', color: 'white' }}
+                                            />
+                                        </label>
+                                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontWeight: 700 }}>
+                                            Nomor sesi terakhir
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={config.concertCounter ?? 0}
+                                                onChange={(e) => updateConfig({ concertCounter: Math.max(0, Number(e.target.value) || 0) })}
+                                                style={{ width: '160px', padding: '10px 14px', fontSize: '14px', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg-tertiary)', color: 'white' }}
+                                            />
+                                        </label>
+                                    </div>
+                                )}
+                                {config.concertMode && (!config.cloudPortalUrl || config.sharingMode !== 'cloud') && (
+                                    <p style={{ color: '#fbbf24', marginTop: '12px', fontWeight: 700 }}>
+                                        QR di strip butuh Sharing Mode "cloud" + Cloud Portal URL publik. Tanpa itu QR menunjuk ke IP lokal booth dan tidak bisa dibuka customer di luar venue.
+                                    </p>
+                                )}
+                                {config.concertMode && !config.printClientEnabled && (
+                                    <p style={{ color: '#fbbf24', marginTop: '8px', fontWeight: 700 }}>
+                                        Booth konser sebaiknya diset ke mode Print Client (tab Printers) agar cetakan dikirim ke printer loket.
+                                    </p>
+                                )}
+                            </div>
+
+                            {(() => {
+                                const art = { ...DEFAULT_AMBIENT_ART, ...config.landingArt }
+                                const setArt = (patch: Partial<typeof art>) => updateConfig({ landingArt: { ...art, ...patch } })
+                                const pill = (active: boolean): React.CSSProperties => ({
+                                    padding: '8px 16px',
+                                    borderRadius: '999px',
+                                    border: active ? '2px solid var(--brand-orange-soft)' : '1px solid rgba(255,255,255,0.18)',
+                                    background: active ? 'rgba(254,107,0,0.15)' : 'transparent',
+                                    color: 'white',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                })
+                                const slider = (label: string, value: number, min: number, max: number, step: number, onChange: (v: number) => void, fmt: (v: number) => string) => (
+                                    <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: 'white', fontWeight: 700, minWidth: '200px', flex: 1 }}>
+                                        <span>{label}: <span style={{ color: 'var(--brand-orange-soft)' }}>{fmt(value)}</span></span>
+                                        <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ accentColor: 'var(--brand-orange-soft)', boxShadow: 'none', padding: 0 }} />
+                                    </label>
+                                )
+                                return (
+                                    <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
+                                        <h3>Animasi Beranda</h3>
+                                        <p>Grafik abstrak 2D bergradasi di halaman awal. Saat live camera background aktif, animasi menjadi overlay transparan di atas kamera.</p>
+                                        <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', marginTop: '12px' }}>
+                                            <div style={{ flex: '1 1 420px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                <div className={styles.timerToggle}>
+                                                    <label className={styles.toggleSwitch}>
+                                                        <input type="checkbox" checked={art.enabled} onChange={(e) => setArt({ enabled: e.target.checked })} />
+                                                        <span className={styles.toggleSlider}></span>
+                                                    </label>
+                                                    <span className={styles.toggleLabel}>{art.enabled ? 'Animasi aktif' : 'Animasi mati'}</span>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                    {([['aurora', 'Aurora'], ['shapes', 'Geometri'], ['waves', 'Gelombang']] as const).map(([id, name]) => (
+                                                        <button key={id} type="button" style={pill(art.style === id)} onClick={() => setArt({ style: id })}>{name}</button>
+                                                    ))}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                    {AMBIENT_PALETTES.map((pal) => (
+                                                        <button key={pal.name} type="button" style={{ ...pill(pal.colors.join() === art.colors.join()), display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setArt({ colors: pal.colors })}>
+                                                            <span style={{ width: '42px', height: '14px', borderRadius: '7px', background: `linear-gradient(90deg, ${pal.colors.join(', ')})` }} />
+                                                            {pal.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', color: 'white', fontWeight: 700 }}>
+                                                    <span>Warna kustom</span>
+                                                    {art.colors.map((c, i) => (
+                                                        <input
+                                                            key={i}
+                                                            type="color"
+                                                            value={c}
+                                                            onChange={(e) => {
+                                                                const next = [...art.colors] as [string, string, string]
+                                                                next[i] = e.target.value
+                                                                setArt({ colors: next })
+                                                            }}
+                                                            style={{ width: '44px', height: '32px', padding: 0, border: 'none', background: 'none', boxShadow: 'none', cursor: 'pointer' }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                                                    {slider('Kecepatan', art.speed, 0.25, 2, 0.05, (v) => setArt({ speed: v }), (v) => `${v.toFixed(2)}x`)}
+                                                    {slider('Opasitas', art.opacity, 0.1, 1, 0.05, (v) => setArt({ opacity: v }), (v) => `${Math.round(v * 100)}%`)}
+                                                    {slider('Opasitas di atas kamera', art.liveOpacity, 0, 1, 0.05, (v) => setArt({ liveOpacity: v }), (v) => `${Math.round(v * 100)}%`)}
+                                                </div>
+                                            </div>
+                                            <div style={{ flex: '0 1 360px', aspectRatio: config.appOrientation === 'portrait' ? '9 / 16' : '16 / 9', maxHeight: '420px', borderRadius: '14px', overflow: 'hidden', background: 'var(--brand-royal)', position: 'relative' }}>
+                                                <AmbientArt settings={{ ...art, enabled: true }} />
+                                                <span style={{ position: 'absolute', left: 12, bottom: 10, fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>Preview</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })()}
+
+                            <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
+                                <h3>App Layout Orientation</h3>
                                 <p>Set the display layout mode for the photobooth app screen</p>
                                 <div style={{ display: 'flex', gap: '24px', marginTop: '16px' }}>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 700, color: 'white' }}>
@@ -1363,7 +1523,7 @@ function AdminDashboard(): JSX.Element {
                                             onChange={() => updateConfig({ appOrientation: 'landscape' })}
                                             style={{ width: '20px', height: '20px', accentColor: 'var(--clay-blue)' }}
                                         />
-                                        <span>🖥️ Landscape (Horizontal)</span>
+                                        <span>Landscape (Horizontal)</span>
                                     </label>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontWeight: 700, color: 'white' }}>
                                         <input
@@ -1374,13 +1534,13 @@ function AdminDashboard(): JSX.Element {
                                             onChange={() => updateConfig({ appOrientation: 'portrait' })}
                                             style={{ width: '20px', height: '20px', accentColor: 'var(--clay-blue)' }}
                                         />
-                                        <span>📱 Portrait (Vertical)</span>
+                                        <span>Portrait (Vertical)</span>
                                     </label>
                                 </div>
                             </div>
 
                             <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                                <h3>📷 Orientasi & Rotasi Kamera (Camera Tilt)</h3>
+                                <h3>Orientasi & Rotasi Kamera (Camera Tilt)</h3>
                                 <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>
                                     Aktifkan jika kamera fisik dipasang miring 90° (Portrait Tilt) agar tampilan live preview dan hasil foto tidak terpotong (*side crop*) pada Mode Vertikal.
                                 </p>
@@ -1402,7 +1562,7 @@ function AdminDashboard(): JSX.Element {
                                             boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
                                         }}
                                     >
-                                        {(config.cameraRotation === 90 || config.cameraRotation === 270) ? '🔄 Kamera Dimiringkan (ON - 90°)' : '📷 Kamera Normal (OFF - 0°)'}
+                                        {(config.cameraRotation === 90 || config.cameraRotation === 270) ? 'Kamera Dimiringkan (ON - 90°)' : 'Kamera Normal (OFF - 0°)'}
                                     </button>
 
                                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '8px 16px', borderRadius: '8px' }}>
@@ -1430,14 +1590,14 @@ function AdminDashboard(): JSX.Element {
                             </div>
 
                             <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                                <h3>🏠 Custom Home Background</h3>
+                                <h3>Custom Home Background</h3>
                                 <p>Upload custom images or videos for the Home screen background. A landscape background will be used in Horizontal layout, and a portrait background will be used in Vertical layout. Toggling the Live Cam background on the Home screen will override these settings.</p>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
                                     
                                     {/* Landscape Custom Background */}
                                     <div className={styles.bgSettingRow}>
                                         <div className={styles.bgSettingInfo}>
-                                            <h4 className={styles.bgSettingTitle}>🖥️ Landscape Background (Horizontal Mode)</h4>
+                                            <h4 className={styles.bgSettingTitle}>Landscape Background (Horizontal Mode)</h4>
                                             <span className={styles.bgSettingPath}>
                                                 {config.customBgLandscape 
                                                     ? `Selected: ${config.customBgLandscape.split('/').pop() || config.customBgLandscape.split('\\').pop()} (${config.customBgLandscapeType})`
@@ -1466,7 +1626,7 @@ function AdminDashboard(): JSX.Element {
                                     {/* Portrait Custom Background */}
                                     <div className={styles.bgSettingRow}>
                                         <div className={styles.bgSettingInfo}>
-                                            <h4 className={styles.bgSettingTitle}>📱 Portrait Background (Vertical Mode)</h4>
+                                            <h4 className={styles.bgSettingTitle}>Portrait Background (Vertical Mode)</h4>
                                             <span className={styles.bgSettingPath}>
                                                 {config.customBgPortrait 
                                                     ? `Selected: ${config.customBgPortrait.split('/').pop() || config.customBgPortrait.split('\\').pop()} (${config.customBgPortraitType})`
@@ -1496,7 +1656,7 @@ function AdminDashboard(): JSX.Element {
                             </div>
 
                             <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                                <h3>🔮 Auto Mirror Output</h3>
+                                <h3>Auto Mirror Output</h3>
                                 <p>Set default mirror mode (flop horizontally) for all photo and video outputs</p>
                                 <div className={styles.timerToggle}>
                                     <label className={styles.toggleSwitch}>
@@ -1532,7 +1692,7 @@ function AdminDashboard(): JSX.Element {
                             </div>
 
                             <div className={styles.timerCard}>
-                                <h3>🎚️ Enable Countdown Timer</h3>
+                                <h3>Enable Countdown Timer</h3>
                                 <p>Toggle the countdown timer during photo capture sessions</p>
                                 <div className={styles.timerToggle}>
                                     <label className={styles.toggleSwitch}>
@@ -1550,7 +1710,7 @@ function AdminDashboard(): JSX.Element {
                             </div>
 
                             <div className={styles.timerCard}>
-                                <h3>⏱️ Countdown Duration</h3>
+                                <h3>Countdown Duration</h3>
                                 <p>Time before photo capture (seconds)</p>
                                 <div className={styles.timerInput}>
                                     <input
@@ -1566,7 +1726,7 @@ function AdminDashboard(): JSX.Element {
                             </div>
 
                             <div className={styles.timerCard}>
-                                <h3>👁️ Preview Duration</h3>
+                                <h3>Preview Duration</h3>
                                 <p>Time to show captured photo (seconds)</p>
                                 <div className={styles.timerInput}>
                                     <input
@@ -1581,7 +1741,7 @@ function AdminDashboard(): JSX.Element {
                             </div>
 
                             <div className={styles.timerCard}>
-                                <h3>⏰ Session Timeout</h3>
+                                <h3>Session Timeout</h3>
                                 <p>Auto-reset session after inactivity (seconds)</p>
                                 <div className={styles.timerInput}>
                                     <input
@@ -1598,7 +1758,7 @@ function AdminDashboard(): JSX.Element {
 
                             {/* Per-Session Timer Section */}
                             <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                                <h3>🎯 Per-Page Session Timers</h3>
+                                <h3>Per-Page Session Timers</h3>
                                 <p>Enable countdown timers displayed at the top of each page</p>
                                 <div className={styles.timerToggle}>
                                     <label className={styles.toggleSwitch}>
@@ -1616,7 +1776,7 @@ function AdminDashboard(): JSX.Element {
                             </div>
 
                             <div className={styles.timerCard}>
-                                <h3>🖼️ Frame Selection Timeout</h3>
+                                <h3>Frame Selection Timeout</h3>
                                 <p>Time limit for selecting a frame (seconds)</p>
                                 <div className={styles.timerInput}>
                                     <input
@@ -1633,7 +1793,7 @@ function AdminDashboard(): JSX.Element {
                             </div>
 
                             <div className={styles.timerCard}>
-                                <h3>📸 Capture Session Timeout</h3>
+                                <h3>Capture Session Timeout</h3>
                                 <p>Time limit for photo capture (seconds)</p>
                                 <div className={styles.timerInput}>
                                     <input
@@ -1650,7 +1810,7 @@ function AdminDashboard(): JSX.Element {
                             </div>
 
                             <div className={styles.timerCard}>
-                                <h3>✨ Post Processing Timeout</h3>
+                                <h3>Post Processing Timeout</h3>
                                 <p>Time limit for editing and sharing (seconds)</p>
                                 <div className={styles.timerInput}>
                                     <input
@@ -1686,7 +1846,7 @@ function AdminDashboard(): JSX.Element {
                                             {filter.previewPath ? (
                                                 <img src={`file://${filter.previewPath}`} alt={filter.name} />
                                             ) : (
-                                                <div className={styles.filterPlaceholder}>🎨</div>
+                                                <div className={styles.filterPlaceholder}></div>
                                             )}
                                         </div>
                                         <span className={styles.filterName}>{filter.name}</span>
@@ -1714,7 +1874,7 @@ function AdminDashboard(): JSX.Element {
                 {activeTab === 'payment' && (
                     <div className={styles.timersTab}>
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <h3>💳 Payment Gateway</h3>
+                            <h3>Payment Gateway</h3>
                             <p>Enable QRIS payment before photo capture</p>
                             <div className={styles.timerToggle}>
                                 <label className={styles.toggleSwitch}>
@@ -1732,7 +1892,7 @@ function AdminDashboard(): JSX.Element {
                         </div>
 
                         <div className={styles.timerCard}>
-                            <h3>💰 Session Price</h3>
+                            <h3>Session Price</h3>
                             <p>Base price for 1 session (includes 1 4R print)</p>
                             <div className={styles.timerInput}>
                                 <input
@@ -1749,7 +1909,7 @@ function AdminDashboard(): JSX.Element {
                         </div>
 
                         <div className={styles.timerCard}>
-                            <h3>🖨️ Additional Print Price</h3>
+                            <h3>Additional Print Price</h3>
                             <p>Price per 2 additional prints</p>
                             <div className={styles.timerInput}>
                                 <input
@@ -1766,7 +1926,7 @@ function AdminDashboard(): JSX.Element {
                         </div>
 
                         <div className={styles.timerCard}>
-                            <h3>⏱️ Payment Timeout</h3>
+                            <h3>Payment Timeout</h3>
                             <p>Time limit for payment (seconds)</p>
                             <div className={styles.timerInput}>
                                 <input
@@ -1783,7 +1943,7 @@ function AdminDashboard(): JSX.Element {
                         </div>
 
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <h3>💳 Payment Gateway Provider</h3>
+                            <h3>Payment Gateway Provider</h3>
                             <p>Pilih penyedia layanan payment gateway yang digunakan</p>
                             <select
                                 value={config.paymentGateway || 'midtrans'}
@@ -1798,7 +1958,7 @@ function AdminDashboard(): JSX.Element {
 
                         {(!config.paymentGateway || config.paymentGateway === 'midtrans') && (
                             <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                                <h3>🔑 Midtrans API Keys</h3>
+                                <h3>Midtrans API Keys</h3>
                                 <p>Enter your Midtrans Sandbox/Production keys</p>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                                     <div>
@@ -1829,7 +1989,7 @@ function AdminDashboard(): JSX.Element {
 
                         {config.paymentGateway === 'doku' && (
                             <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                                <h3>🔑 DOKU API Credentials</h3>
+                                <h3>DOKU API Credentials</h3>
                                 <p>Enter your DOKU Sandbox/Production credentials</p>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
                                     <div>
@@ -1872,7 +2032,7 @@ function AdminDashboard(): JSX.Element {
                         )}
 
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <h3>📝 Payment Instructions</h3>
+                            <h3>Payment Instructions</h3>
                             <p>Text shown to users during payment</p>
                             <textarea
                                 value={config.paymentInstructions}
@@ -1898,21 +2058,21 @@ function AdminDashboard(): JSX.Element {
                 {activeTab === 'history' && (
                     <div className={styles.historyTab}>
                         <div className={styles.historyHeader}>
-                            <h3>📋 Session History Log</h3>
+                            <h3>Session History Log</h3>
                             <span className={styles.historyCount}>Total: {historyTotal} sessions</span>
                             <button
                                 className={styles.addButton}
                                 onClick={loadHistory}
                                 disabled={isLoadingHistory}
                             >
-                                🔄 Refresh
+                                Refresh
                             </button>
                             <button
                                 className={styles.addButton}
                                 onClick={exportToCSV}
                                 disabled={isLoadingHistory || historyTotal === 0}
                             >
-                                📥 Export CSV
+                                Export CSV
                             </button>
                         </div>
 
@@ -1938,10 +2098,10 @@ function AdminDashboard(): JSX.Element {
                                                 {item.email || <em style={{ opacity: 0.5 }}>No email</em>}
                                             </span>
                                             <span className={styles.frameCell}>
-                                                🖼️ {item.frame_name || '-'}
+                                                {item.frame_name || '-'}
                                             </span>
                                             <span className={styles.printCell}>
-                                                🖨️ {item.print_count}
+                                                {item.print_count}
                                             </span>
                                             <span className={styles.galleryCell}>
                                                 <a
@@ -1950,7 +2110,7 @@ function AdminDashboard(): JSX.Element {
                                                     rel="noopener noreferrer"
                                                     className={styles.galleryLink}
                                                 >
-                                                    🔗 View
+                                                    View
                                                 </a>
                                             </span>
                                             <span className={styles.dateCell}>
@@ -2000,7 +2160,7 @@ function AdminDashboard(): JSX.Element {
                 {activeTab === 'sharing' && (
                     <div className={styles.timersTab}>
                         <div className={styles.timerCard}>
-                            <h3>📡 Event File Sharing Mode</h3>
+                            <h3>Event File Sharing Mode</h3>
                             <p>Choose how guests will receive their digital copies</p>
 
                             <div className={styles.timerInput} style={{ marginTop: '20px', display: 'flex', gap: '20px', flexDirection: 'column' }}>
@@ -2014,7 +2174,7 @@ function AdminDashboard(): JSX.Element {
                                         style={{ width: '20px', height: '20px' }}
                                     />
                                     <div>
-                                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>☁️ Cloud Server (Supabase/Google Drive)</div>
+                                        <div style={{ fontWeight: 'bold', fontSize: '16px' }}>Cloud Server (Supabase/Google Drive)</div>
                                         <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>Guests need internet access to download files. QR code points to an online web gallery.</div>
                                         {(config.sharingMode === 'cloud' || !config.sharingMode) && (
                                             <div style={{ marginTop: '12px' }}>
@@ -2075,8 +2235,8 @@ function AdminDashboard(): JSX.Element {
                                 )}
 
                                 {config.sharingMode === 'local' && localIp && (
-                                    <div style={{ marginTop: '10px', padding: '20px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
-                                        <h4 style={{ margin: '0 0 10px 0', color: '#60a5fa', fontSize: '16px' }}>📱 Remote Admin Monitor</h4>
+                                    <div style={{ marginTop: '10px', padding: '20px', background: 'rgba(254, 107, 0, 0.1)', borderRadius: '12px', border: '1px solid rgba(254, 107, 0, 0.3)' }}>
+                                        <h4 style={{ margin: '0 0 10px 0', color: '#ffa366', fontSize: '16px' }}>Remote Admin Monitor</h4>
                                         <p style={{ margin: '0 0 15px 0', color: '#9ca3af', fontSize: '14px', lineHeight: '1.5' }}>
                                             To view sessions and remotely trigger prints from another device (like your phone or tablet), connect that device to this laptop's WiFi hotspot and open this URL in your browser:
                                         </p>
@@ -2104,7 +2264,7 @@ function AdminDashboard(): JSX.Element {
                     <div className={styles.timersTab}>
                         {/* Camera Mode Section */}
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <h3>📷 Camera Mode</h3>
+                            <h3>Camera Mode</h3>
                             <p>Choose between webcam screenshot or DSLR trigger (native Windows WIA)</p>
                             <div style={{ marginTop: '15px', display: 'flex', gap: '15px', flexDirection: 'column' }}>
                                 <label style={{
@@ -2126,7 +2286,7 @@ function AdminDashboard(): JSX.Element {
                                         style={{ width: '20px', height: '20px' }}
                                     />
                                     <div>
-                                        <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'white' }}>🖥️ Mock Camera (Webcam)</div>
+                                        <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'white' }}>Mock Camera (Webcam)</div>
                                         <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px' }}>Uses built-in webcam or external USB webcam. Takes screenshot from video feed.</div>
                                     </div>
                                 </label>
@@ -2150,7 +2310,7 @@ function AdminDashboard(): JSX.Element {
                                         style={{ width: '20px', height: '20px' }}
                                     />
                                     <div>
-                                        <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'white' }}>📸 DSLR Camera (digiCamControl)</div>
+                                        <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'white' }}>DSLR Camera (digiCamControl)</div>
                                         <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px' }}>
                                             Full Control: Shutter, ISO, Aperture, Shutter Speed, Live View. 
                                             Menggunakan digiCamControl HTTP API.
@@ -2177,9 +2337,9 @@ function AdminDashboard(): JSX.Element {
                                         style={{ width: '20px', height: '20px' }}
                                     />
                                     <div>
-                                        <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'white' }}>📷 Canon EDSDK (dslrBooth Engine)</div>
+                                        <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'white' }}>Canon EDSDK (dslrBooth Engine)</div>
                                         <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px' }}>
-                                            <strong style={{ color: '#f59e0b' }}>⚡ RECOMMENDED untuk Canon</strong> — Menggunakan Canon EDSDK native SDK (engine yang sama dengan dslrBooth).
+                                            <strong style={{ color: '#f59e0b' }}>RECOMMENDED untuk Canon</strong> — Menggunakan Canon EDSDK native SDK (engine yang sama dengan dslrBooth).
                                             Trigger tercepat (~200ms), event-driven capture, foto langsung ke RAM. 
                                             Support: Canon EOS 1300D, 60D, 70D, 80D, 5D, 6D, R series.
                                         </div>
@@ -2189,9 +2349,9 @@ function AdminDashboard(): JSX.Element {
                                 <label style={{
                                     display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer',
                                     padding: '15px',
-                                    border: config.cameraMode === 'dslr' ? '2px solid #3b82f6' : '2px solid rgba(255,255,255,0.1)',
+                                    border: config.cameraMode === 'dslr' ? '2px solid #fe6b00' : '2px solid rgba(255,255,255,0.1)',
                                     borderRadius: '12px',
-                                    background: config.cameraMode === 'dslr' ? 'rgba(59,130,246,0.1)' : 'transparent'
+                                    background: config.cameraMode === 'dslr' ? 'rgba(254, 107, 0,0.1)' : 'transparent'
                                 }}>
                                     <input
                                         type="radio"
@@ -2205,7 +2365,7 @@ function AdminDashboard(): JSX.Element {
                                         style={{ width: '20px', height: '20px' }}
                                     />
                                     <div>
-                                        <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'white' }}>📸 DSLR Camera (CLI Mode)</div>
+                                        <div style={{ fontWeight: 'bold', fontSize: '16px', color: 'white' }}>DSLR Camera (CLI Mode)</div>
                                         <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px' }}>
                                             Legacy Mode: Uses external dslr-remote or DSLR Remote Pro.
                                         </div>
@@ -2217,7 +2377,7 @@ function AdminDashboard(): JSX.Element {
                                 <div style={{ marginTop: '15px', padding: '20px', background: 'rgba(245,158,11,0.05)', borderRadius: '12px', border: '1px solid rgba(245,158,11,0.3)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                                         <div>
-                                            <h4 style={{ margin: 0, color: '#fbbf24' }}>📷 Canon EDSDK Control Panel</h4>
+                                            <h4 style={{ margin: 0, color: '#fbbf24' }}>Canon EDSDK Control Panel</h4>
                                             <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#9ca3af' }}>
                                                 Engine yang sama dengan dslrBooth — trigger langsung via Canon SDK
                                             </p>
@@ -2246,7 +2406,7 @@ function AdminDashboard(): JSX.Element {
                                                     color: 'white', border: 'none', fontSize: '13px', fontWeight: 'bold'
                                                 }}
                                             >
-                                                {cameraConnecting ? '⏳ Connecting...' : cameraConnected ? '✅ Connected' : '🔌 Connect Camera'}
+                                                {cameraConnecting ? '⏳ Connecting...' : cameraConnected ? '✅ Connected' : 'Connect Camera'}
                                             </button>
                                             <button
                                                 onClick={async () => {
@@ -2267,7 +2427,7 @@ function AdminDashboard(): JSX.Element {
                                                     background: '#dc2626', color: 'white', border: 'none', fontSize: '13px', fontWeight: 'bold'
                                                 }}
                                             >
-                                                📸 Test Capture
+                                                Test Capture
                                             </button>
                                         </div>
                                     </div>
@@ -2299,7 +2459,7 @@ function AdminDashboard(): JSX.Element {
                                 <div style={{ marginTop: '15px', padding: '20px', background: 'rgba(239,68,68,0.05)', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.3)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                                         <div>
-                                            <h4 style={{ margin: 0, color: '#fca5a5' }}>🎛️ Camera Control Panel (digiCamControl)</h4>
+                                            <h4 style={{ margin: 0, color: '#fca5a5' }}>Camera Control Panel (digiCamControl)</h4>
                                             <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#9ca3af' }}>
                                                 Full control: Shutter, ISO, Aperture, Shutter Speed, Live View
                                             </p>
@@ -2359,7 +2519,7 @@ function AdminDashboard(): JSX.Element {
                                                     opacity: cameraConnecting ? 0.6 : 1
                                                 }}
                                             >
-                                                {cameraConnecting ? '⏳ Connecting...' : cameraConnected ? '✅ Connected' : '🔌 Connect Camera'}
+                                                {cameraConnecting ? '⏳ Connecting...' : cameraConnected ? '✅ Connected' : 'Connect Camera'}
                                             </button>
                                         </div>
                                     </div>
@@ -2380,7 +2540,7 @@ function AdminDashboard(): JSX.Element {
                                                     (e.target as HTMLImageElement).style.display = 'block'
                                                 }}
                                             />
-                                            <p style={{ margin: '4px 0', fontSize: '11px', color: '#666' }}>📹 Live View from Camera Sensor</p>
+                                            <p style={{ margin: '4px 0', fontSize: '11px', color: '#666' }}>Live View from Camera Sensor</p>
                                         </div>
                                     )}
 
@@ -2482,7 +2642,7 @@ function AdminDashboard(): JSX.Element {
                                                 try {
                                                     const result = await window.api.camera.capture('admin_test')
                                                     if (result.success && result.data?.success) {
-                                                        setCaptureTestResult('✅ Capture berhasil! 📸')
+                                                        setCaptureTestResult('✅ Capture berhasil! ')
                                                     } else {
                                                         setCaptureTestResult('❌ Gagal: ' + (result.data?.error || result.error || 'Unknown'))
                                                     }
@@ -2492,7 +2652,7 @@ function AdminDashboard(): JSX.Element {
                                             }}
                                             style={{ padding: '10px 20px', background: cameraConnected ? '#ef4444' : '#444', color: 'white', border: 'none', borderRadius: '8px', cursor: cameraConnected ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '14px' }}
                                         >
-                                            📸 TEST CAPTURE
+                                            TEST CAPTURE
                                         </button>
 
                                         <button
@@ -2513,9 +2673,9 @@ function AdminDashboard(): JSX.Element {
                                                 } catch (e) { console.error('Refresh settings error:', e) }
                                                 setCameraSettingsLoading(false)
                                             }}
-                                            style={{ padding: '10px 20px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '8px', cursor: cameraConnected ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '14px' }}
+                                            style={{ padding: '10px 20px', background: '#fe6b00', color: 'white', border: 'none', borderRadius: '8px', cursor: cameraConnected ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '14px' }}
                                         >
-                                            🔄 Refresh Settings
+                                            Refresh Settings
                                         </button>
 
                                         {liveViewActive ? (
@@ -2528,7 +2688,7 @@ function AdminDashboard(): JSX.Element {
                                                 }}
                                                 style={{ padding: '10px 20px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
                                             >
-                                                🔴 Stop Live View
+                                                Stop Live View
                                             </button>
                                         ) : cameraConnected ? (
                                             <button
@@ -2544,14 +2704,14 @@ function AdminDashboard(): JSX.Element {
                                                 }}
                                                 style={{ padding: '10px 20px', background: '#10b981', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
                                             >
-                                                📹 Start Live View
+                                                Start Live View
                                             </button>
                                         ) : null}
                                     </div>
 
                                     {/* Result Message */}
                                     {captureTestResult && (
-                                        <div style={{ marginTop: '10px', padding: '10px', borderRadius: '8px', background: captureTestResult.startsWith('✅') ? 'rgba(16,185,129,0.1)' : captureTestResult.startsWith('⏳') ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)', color: captureTestResult.startsWith('✅') ? '#10b981' : captureTestResult.startsWith('⏳') ? '#60a5fa' : '#ef4444', fontSize: '13px' }}>
+                                        <div style={{ marginTop: '10px', padding: '10px', borderRadius: '8px', background: captureTestResult.startsWith('✅') ? 'rgba(16,185,129,0.1)' : captureTestResult.startsWith('⏳') ? 'rgba(254, 107, 0,0.1)' : 'rgba(239,68,68,0.1)', color: captureTestResult.startsWith('✅') ? '#10b981' : captureTestResult.startsWith('⏳') ? '#ffa366' : '#ef4444', fontSize: '13px' }}>
                                             {captureTestResult}
                                         </div>
                                     )}
@@ -2559,7 +2719,7 @@ function AdminDashboard(): JSX.Element {
                                     {/* Setup instructions */}
                                     {!cameraConnected && (
                                         <div style={{ marginTop: '15px', padding: '12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', fontSize: '12px', color: '#9ca3af', lineHeight: '1.8' }}>
-                                            <b style={{ color: '#fca5a5' }}>📋 Setup Awal (1x saja):</b><br/>
+                                            <b style={{ color: '#fca5a5' }}>Setup Awal (1x saja):</b><br/>
                                             1. Hubungkan kamera Canon via USB<br/>
                                             2. Buka <b>CameraControl.exe</b> (digiCamControl) → pastikan kamera terdeteksi<br/>
                                             3. Buka <b>Settings → Webserver</b> → centang <b>"Use web server"</b><br/>
@@ -2571,9 +2731,9 @@ function AdminDashboard(): JSX.Element {
                             )}
 
                             {config.cameraMode === 'dslr' && (
-                                <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(59,130,246,0.1)', borderRadius: '10px', border: '1px solid rgba(59,130,246,0.3)' }}>
-                                    <p style={{ margin: 0, fontSize: '13px', color: '#60a5fa', lineHeight: '1.6' }}>
-                                        🚀 <b>Mode CLI (Best Performance)</b><br />
+                                <div style={{ marginTop: '15px', padding: '15px', background: 'rgba(254, 107, 0,0.1)', borderRadius: '10px', border: '1px solid rgba(254, 107, 0,0.3)' }}>
+                                    <p style={{ margin: 0, fontSize: '13px', color: '#ffa366', lineHeight: '1.6' }}>
+                                        <b>Mode CLI (Best Performance)</b><br />
                                         • <b>Live Preview:</b> Gunakan <b>Canon EOS Webcam Utility</b> (Gratis).<br />
                                         • <b>Shutter / Jepret:</b> Menggunakan CLI ringan (dslr-remote).<br />
                                         • Laptop tetap enteng & tidak lemot selama acara.
@@ -2582,21 +2742,21 @@ function AdminDashboard(): JSX.Element {
                                         onClick={async () => {
                                             try {
                                                 const result = await window.api.camera.capture('admin_test')
-                                                if (result.success) alert('Shutter Berhasil Ter-trigger! 📸')
+                                                if (result.success) alert('Shutter Berhasil Ter-trigger! ')
                                                 else alert('Gagal: ' + result.error)
                                             } catch (e: any) {
                                                 alert('Error: ' + e.message)
                                             }
                                         }}
-                                        style={{ marginTop: '10px', background: '#3b82f6', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
+                                        style={{ marginTop: '10px', background: '#fe6b00', color: 'white', border: 'none', padding: '8px 15px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}
                                     >
-                                        📸 TEST CLI SHUTTER
+                                        TEST CLI SHUTTER
                                     </button>
                                 </div>
                             )}
 
                             <div style={{ marginTop: '20px', padding: '15px', background: 'var(--color-bg-tertiary)', borderRadius: '10px', border: '1px solid var(--color-border)' }}>
-                                <h4>🖥️ Live Preview Source (Webcam / Capture Card)</h4>
+                                <h4>Live Preview Source (Webcam / Capture Card)</h4>
                                 <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '10px' }}>
                                     Pilih perangkat sumber video untuk preview di layar (misalnya USB Capture Card atau Webcam).
                                 </p>
@@ -2661,13 +2821,13 @@ function AdminDashboard(): JSX.Element {
                                             whiteSpace: 'nowrap'
                                         }}
                                     >
-                                        {isLoadingDevices ? '🔄...' : '🔄 REFRESH'}
+                                        {isLoadingDevices ? '...' : 'REFRESH'}
                                     </button>
                                 </div>
 
                                 {/* Camera Tilt / Rotation Controls in Camera Tab */}
                                 <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px dashed var(--color-border)' }}>
-                                    <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>📐 Rotasi Kamera (Camera Tilt)</h4>
+                                    <h4 style={{ fontSize: '14px', marginBottom: '8px' }}>Rotasi Kamera (Camera Tilt)</h4>
                                     <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '12px' }}>
                                         Atur rotasi kamera jika posisi fisik kamera di-tilting 90 derajat untuk Mode Vertikal.
                                     </p>
@@ -2686,7 +2846,7 @@ function AdminDashboard(): JSX.Element {
                                                 cursor: 'pointer'
                                             }}
                                         >
-                                            {(config.cameraRotation === 90 || config.cameraRotation === 270) ? '🔄 Kamera Dimiringkan (ON)' : '📷 Kamera Normal (OFF)'}
+                                            {(config.cameraRotation === 90 || config.cameraRotation === 270) ? 'Kamera Dimiringkan (ON)' : 'Kamera Normal (OFF)'}
                                         </button>
                                         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                                             {[
@@ -2714,7 +2874,7 @@ function AdminDashboard(): JSX.Element {
                                 {/* DSLR Live View Zoom slider */}
                                 <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--color-border)' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                        <label style={{ fontSize: '14px', fontWeight: 'bold', color: 'white' }}>🔎 Zoom DSLR Live View</label>
+                                        <label style={{ fontSize: '14px', fontWeight: 'bold', color: 'white' }}>Zoom DSLR Live View</label>
                                         <span style={{ fontSize: '14px', color: 'var(--color-text-secondary)', fontWeight: 'bold' }}>{Math.round((config.cameraZoom || 1.0) * 100)}%</span>
                                     </div>
                                     <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '0 0 10px 0' }}>
@@ -2731,7 +2891,7 @@ function AdminDashboard(): JSX.Element {
                                             style={{
                                                 flex: 1,
                                                 cursor: 'pointer',
-                                                accentColor: '#3b82f6'
+                                                accentColor: '#fe6b00'
                                             }}
                                         />
                                         <button
@@ -2756,7 +2916,7 @@ function AdminDashboard(): JSX.Element {
 
 
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <h3>🖨️ Auto-Printing System</h3>
+                            <h3>Auto-Printing System</h3>
                             <p>Enable automatic printing after post-processing is complete</p>
                             <div className={styles.timerToggle}>
                                 <label className={styles.toggleSwitch}>
@@ -2774,7 +2934,7 @@ function AdminDashboard(): JSX.Element {
                         </div>
 
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <h3>⚙️ Printer Selection</h3>
+                            <h3>Printer Selection</h3>
                             <p>Select which printer to use for photos and photostrips</p>
                             
                             <div style={{ marginTop: '15px' }}>
@@ -2813,7 +2973,7 @@ function AdminDashboard(): JSX.Element {
 
                         {/* Double Device — Remote Printing */}
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <h3>🔗 Double Device — Remote Printing</h3>
+                            <h3>Double Device — Remote Printing</h3>
                             <p>Connect 2 devices to share a single printer over LAN/Hotspot</p>
 
                             {/* Device Name */}
@@ -2857,7 +3017,7 @@ function AdminDashboard(): JSX.Element {
                                         style={{ width: '20px', height: '20px' }}
                                     />
                                     <div>
-                                        <div style={{ fontWeight: 600 }}>🖨️ Printer Lokal (Default)</div>
+                                        <div style={{ fontWeight: 600 }}>Printer Lokal (Default)</div>
                                         <div style={{ fontSize: '12px', color: '#9ca3af' }}>
                                             Device ini mencetak langsung ke printer yang terhubung via USB
                                         </div>
@@ -2868,9 +3028,9 @@ function AdminDashboard(): JSX.Element {
                                 <label style={{
                                     display: 'flex', alignItems: 'center', gap: '15px', cursor: 'pointer',
                                     padding: '15px',
-                                    border: config.printServerEnabled ? '2px solid #3b82f6' : '2px solid rgba(255,255,255,0.1)',
+                                    border: config.printServerEnabled ? '2px solid #fe6b00' : '2px solid rgba(255,255,255,0.1)',
                                     borderRadius: '12px',
-                                    background: config.printServerEnabled ? 'rgba(59,130,246,0.1)' : 'transparent'
+                                    background: config.printServerEnabled ? 'rgba(254, 107, 0,0.1)' : 'transparent'
                                 }}>
                                     <input
                                         type="radio"
@@ -2880,7 +3040,7 @@ function AdminDashboard(): JSX.Element {
                                         style={{ width: '20px', height: '20px' }}
                                     />
                                     <div>
-                                        <div style={{ fontWeight: 600 }}>📡 Print Server (Terima dari device lain)</div>
+                                        <div style={{ fontWeight: 600 }}>Print Server (Terima dari device lain)</div>
                                         <div style={{ fontSize: '12px', color: '#9ca3af' }}>
                                             Device ini terhubung ke printer & menerima print job dari device lain via LAN
                                         </div>
@@ -2903,7 +3063,7 @@ function AdminDashboard(): JSX.Element {
                                         style={{ width: '20px', height: '20px' }}
                                     />
                                     <div>
-                                        <div style={{ fontWeight: 600 }}>📤 Print Client (Kirim ke device lain)</div>
+                                        <div style={{ fontWeight: 600 }}>Print Client (Kirim ke device lain)</div>
                                         <div style={{ fontSize: '12px', color: '#9ca3af' }}>
                                             Device ini mengirim print job ke Print Server device lain via LAN
                                         </div>
@@ -2916,11 +3076,11 @@ function AdminDashboard(): JSX.Element {
                                 <div style={{
                                     marginTop: '20px',
                                     padding: '16px',
-                                    background: 'rgba(59,130,246,0.1)',
-                                    border: '1px solid rgba(59,130,246,0.3)',
+                                    background: 'rgba(254, 107, 0,0.1)',
+                                    border: '1px solid rgba(254, 107, 0,0.3)',
                                     borderRadius: '12px'
                                 }}>
-                                    <div style={{ fontWeight: 600, marginBottom: '8px', color: '#60a5fa' }}>
+                                    <div style={{ fontWeight: 600, marginBottom: '8px', color: '#ffa366' }}>
                                         ✅ Print Server Aktif
                                     </div>
                                     <div style={{ fontSize: '13px', color: '#9ca3af' }}>
@@ -2934,7 +3094,7 @@ function AdminDashboard(): JSX.Element {
                                         fontFamily: 'monospace',
                                         fontSize: '16px',
                                         fontWeight: 'bold',
-                                        color: '#60a5fa',
+                                        color: '#ffa366',
                                         letterSpacing: '0.5px'
                                     }}>
                                         http://{localIp || '?.?.?.?'}:5050
@@ -2955,7 +3115,7 @@ function AdminDashboard(): JSX.Element {
                                     borderRadius: '12px'
                                 }}>
                                     <label style={{ display: 'block', fontSize: '13px', color: '#fbbf24', marginBottom: '8px', fontWeight: 600 }}>
-                                        🌐 Print Server URL
+                                        Print Server URL
                                     </label>
                                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                         <input
@@ -2991,7 +3151,7 @@ function AdminDashboard(): JSX.Element {
                                             }}
                                             style={{ whiteSpace: 'nowrap' }}
                                         >
-                                            🔍 Tes Koneksi
+                                            Tes Koneksi
                                         </button>
                                     </div>
                                     <div style={{ marginTop: '10px', fontSize: '12px', color: '#6b7280' }}>
@@ -3004,9 +3164,15 @@ function AdminDashboard(): JSX.Element {
                         {/* Print Queue State */}
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h3>🖨️ Active Print Queue</h3>
+                                <h3>Active Print Queue</h3>
+                                <button
+                                    onClick={() => navigate('/loket')}
+                                    style={{ margin: '8px 0 12px', padding: '10px 18px', borderRadius: '8px', border: 'none', background: 'var(--clay-blue, #fe6b00)', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                                >
+                                    Buka Layar Loket Pengambilan
+                                </button>
                                 <button className={styles.addButton} onClick={fetchPrintData} disabled={isLoadingPrintData}>
-                                    🔄 Refresh
+                                    Refresh
                                 </button>
                             </div>
                             
@@ -3023,8 +3189,8 @@ function AdminDashboard(): JSX.Element {
                                         <span className={styles.printCell} style={{ color: job.sourceDevice && job.sourceDevice !== 'Local' ? '#f59e0b' : '#9ca3af' }}>
                                             {job.sourceDevice || 'Local'}
                                         </span>
-                                        <span className={styles.galleryCell} style={{ color: job.status === 'PRINTING' ? '#3b82f6' : '#f59e0b', fontWeight: 'bold' }}>
-                                            {job.status === 'PRINTING' ? '🖨️ Printing...' : '⏳ Queued'}
+                                        <span className={styles.galleryCell} style={{ color: job.status === 'PRINTING' ? '#fe6b00' : '#f59e0b', fontWeight: 'bold' }}>
+                                            {job.status === 'PRINTING' ? 'Printing...' : '⏳ Queued'}
                                         </span>
                                         <span className={styles.dateCell}>{job.copies} Pages</span>
                                     </div>
@@ -3038,7 +3204,7 @@ function AdminDashboard(): JSX.Element {
 
                         {/* Print History State */}
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <h3>📜 Print History (Recent)</h3>
+                            <h3>Print History (Recent)</h3>
                             
                             <div className={styles.historyTable} style={{ marginTop: '15px', maxHeight: '300px', overflowY: 'auto' }}>
                                 <div className={styles.tableHeader}>
@@ -3070,14 +3236,14 @@ function AdminDashboard(): JSX.Element {
                 {activeTab === 'queue' && (
                      <div className={styles.historyTab}>
                          <div className={styles.historyHeader}>
-                             <h3>☁️ Offline Upload Queue Tracker</h3>
+                             <h3>Offline Upload Queue Tracker</h3>
                              <span className={styles.historyCount}>Pending Items: {cloudQueue.length}</span>
                              <button
                                  className={styles.addButton}
                                  onClick={fetchCloudQueue}
                                  disabled={isLoadingQueue}
                              >
-                                 🔄 Refresh
+                                 Refresh
                              </button>
                          </div>
                          
@@ -3097,7 +3263,7 @@ function AdminDashboard(): JSX.Element {
                                 {cloudQueue.map((item) => (
                                     <div key={item.id} className={styles.tableRow}>
                                         <span className={styles.emailCell}>
-                                            {item.mimeType?.includes('video') ? '🎥 Video' : item.mimeType?.includes('image/gif') ? '🎞️ GIF' : '📸 Photo'}
+                                            {item.mimeType?.includes('video') ? 'Video' : item.mimeType?.includes('image/gif') ? 'GIF' : 'Photo'}
                                         </span>
                                         <span className={styles.printCell} style={{ fontSize: '13px' }}>
                                             {item.destinationPath || <em style={{ opacity: 0.5 }}>Unknown</em>}
@@ -3124,7 +3290,7 @@ function AdminDashboard(): JSX.Element {
                 {activeTab === 'webhook' && (
                     <div className={styles.timersTab}>
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <h3>🔗 Website Queue Integration</h3>
+                            <h3>Website Queue Integration</h3>
                             <p>Hubungkan aplikasi photobooth dengan sistem antrean digital di website Sebooth</p>
                             <div className={styles.timerToggle}>
                                 <label className={styles.toggleSwitch}>
@@ -3136,13 +3302,13 @@ function AdminDashboard(): JSX.Element {
                                     <span className={styles.toggleSlider}></span>
                                 </label>
                                 <span className={styles.toggleLabel}>
-                                    {config.queueEnabled ? '✅ Queue Mode Aktif' : '⚪ Queue Mode Nonaktif'}
+                                    {config.queueEnabled ? '✅ Queue Mode Aktif' : 'Queue Mode Nonaktif'}
                                 </span>
                             </div>
                         </div>
 
                         <div className={styles.timerCard}>
-                            <h3>🌐 API URL</h3>
+                            <h3>API URL</h3>
                             <p>Base URL website Sebooth</p>
                             <input
                                 type="text"
@@ -3163,7 +3329,7 @@ function AdminDashboard(): JSX.Element {
                         </div>
 
                         <div className={styles.timerCard}>
-                            <h3>📋 Event ID</h3>
+                            <h3>Event ID</h3>
                             <p>Pilih Event Antrean atau masukkan UUID secara manual</p>
                             {eventsList.length > 0 && (
                                 <select
@@ -3209,7 +3375,7 @@ function AdminDashboard(): JSX.Element {
                         </div>
 
                         <div className={styles.timerCard}>
-                            <h3>🔑 Webhook Secret</h3>
+                            <h3>Webhook Secret</h3>
                             <p>Shared secret untuk autentikasi webhook (harus sama dengan website)</p>
                             <input
                                 type="password"
@@ -3242,513 +3408,66 @@ function AdminDashboard(): JSX.Element {
                     </div>
                 )}
 
-                {/* Button Indicator Editor Tab */}
+                {/* Physical buttons tab: right-edge rail legend */}
                 {activeTab === 'button-indicator' && (
                     <div className={styles.timersTab}>
                         <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div>
-                                    <h3>🔘 Kustomisasi Penunjuk Tombol Fisik</h3>
-                                    <p style={{ opacity: 0.7, margin: '4px 0 0 0' }}>
-                                        Sesuaikan posisi, bentuk, warna, dan petunjuk visual ke tombol fisik di samping monitor.
-                                    </p>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setIsLayoutEditMode(true)
-                                            navigate('/')
-                                        }}
-                                        style={{
-                                            padding: '10px 18px',
-                                            borderRadius: '10px',
-                                            border: 'none',
-                                            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                                            color: '#ffffff',
-                                            fontWeight: 'bold',
-                                            fontSize: '13px',
-                                            cursor: 'pointer',
-                                            boxShadow: '0 4px 14px rgba(59, 130, 246, 0.4)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px'
-                                        }}
-                                    >
-                                        🚀 Buka Live Layout Editor (Halaman Asli)
-                                    </button>
-                                    <span style={{ fontWeight: 'bold', fontSize: '14px' }}>
-                                        {config.buttonIndicatorEnabled ? '🟢 AKTIF' : '🔴 NONAKTIF'}
-                                    </span>
-                                    <label className={styles.toggleSwitch}>
-                                        <input
-                                            type="checkbox"
-                                            checked={config.buttonIndicatorEnabled ?? false}
-                                            onChange={(e) => updateConfig({ buttonIndicatorEnabled: e.target.checked })}
-                                        />
-                                        <span className={styles.toggleSlider}></span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Interactive Editor Container */}
-                        <div className={styles.timerCard} style={{ gridColumn: '1 / 3' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                <h4 style={{ margin: 0 }}>🎨 Canvas Editor (Drag, Resize & Rotate)</h4>
-                                <span style={{ fontSize: '12px', opacity: 0.6 }}>
-                                    Orientasi Layar: <strong>{config.appOrientation?.toUpperCase() || 'PORTRAIT'}</strong>
-                                </span>
-                            </div>
-
-                            {/* Page Preview Selector Bar */}
-                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px', padding: '10px 14px', backgroundColor: 'var(--color-bg-secondary, #1f2937)', borderRadius: '12px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 'bold', alignSelf: 'center', marginRight: '6px' }}>👁️ Pratinjau Halaman:</span>
-                                {[
-                                    { id: 'landing', label: '🏠 Beranda' },
-                                    { id: 'frames', label: '🖼️ Pilih Frame' },
-                                    { id: 'payment', label: '💳 Pembayaran' },
-                                    { id: 'capture', label: '📸 Sesi Foto' },
-                                    { id: 'photo-review', label: '📷 Review Photo Strip' },
-                                    { id: 'review', label: '🎨 Filter Review' },
-                                    { id: 'sharing', label: '📲 Sharing QR' },
-                                    { id: 'printing', label: '🖨️ Cetak' }
-                                ].map((page) => (
-                                    <button
-                                        key={page.id}
-                                        type="button"
-                                        onClick={() => setIndicatorPreviewPage(page.id as any)}
-                                        style={{
-                                            padding: '6px 12px',
-                                            borderRadius: '8px',
-                                            border: indicatorPreviewPage === page.id ? '2px solid #3b82f6' : '1px solid rgba(255,255,255,0.15)',
-                                            backgroundColor: indicatorPreviewPage === page.id ? '#3b82f6' : 'rgba(255,255,255,0.05)',
-                                            color: '#ffffff',
-                                            fontSize: '12px',
-                                            fontWeight: indicatorPreviewPage === page.id ? 'bold' : 'normal',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.15s ease'
-                                        }}
-                                    >
-                                        {page.label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Canvas Area */}
-                            <div
-                                ref={indicatorCanvasRef}
-                                style={{
-                                    position: 'relative',
-                                    width: '100%',
-                                    height: config.appOrientation === 'landscape' ? '380px' : '520px',
-                                    maxWidth: '650px',
-                                    margin: '0 auto',
-                                    backgroundColor: '#0f172a',
-                                    borderRadius: '16px',
-                                    border: '3px solid #334155',
-                                    overflow: 'hidden',
-                                    boxShadow: 'inset 0 0 40px rgba(0,0,0,0.8)',
-                                    userSelect: 'none'
-                                }}
-                            >
-                                {/* Background Screen Mockup Graphic based on indicatorPreviewPage */}
-                                <div style={{
-                                    position: 'absolute',
-                                    inset: 0,
-                                    pointerEvents: 'none',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    padding: '16px',
-                                    boxSizing: 'border-box'
-                                }}>
-                                    {indicatorPreviewPage === 'landing' && (
-                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', background: 'radial-gradient(circle, rgba(30,58,138,0.4) 0%, rgba(15,23,42,0.9) 100%)', borderRadius: '12px' }}>
-                                            <div style={{ fontSize: '28px', fontWeight: '900', letterSpacing: '2px', color: '#f8fafc', marginBottom: '8px' }}>📸 SEBOOTH</div>
-                                            <div style={{ fontSize: '13px', opacity: 0.7, marginBottom: '24px' }}>Capture Extraordinary Moments</div>
-                                            <div style={{ padding: '14px 32px', borderRadius: '999px', background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white', fontWeight: 'bold', fontSize: '15px', boxShadow: '0 8px 20px rgba(239,68,68,0.4)' }}>
-                                                🚀 MULAI SESI FOTO
-                                            </div>
-                                            <div style={{ fontSize: '11px', opacity: 0.5, marginTop: '16px' }}>Tekan tombol untuk memulai</div>
-                                        </div>
-                                    )}
-
-                                    {indicatorPreviewPage === 'frames' && (
-                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#1e293b', borderRadius: '12px', padding: '16px' }}>
-                                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#f8fafc', marginBottom: '12px' }}>🖼️ Pilih Desain Frame</div>
-                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', flex: 1 }}>
-                                                {[1, 2, 3].map(i => (
-                                                    <div key={i} style={{ border: i === 1 ? '2px solid #3b82f6' : '1px solid #475569', borderRadius: '8px', padding: '8px', background: '#0f172a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                                                        <div style={{ width: '80%', height: '60px', background: '#334155', borderRadius: '4px', marginBottom: '6px' }} />
-                                                        <div style={{ fontSize: '10px', color: '#cbd5e1' }}>Frame {i}</div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div style={{ marginTop: '12px', padding: '10px', background: '#3b82f6', color: 'white', textAlign: 'center', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px' }}>
-                                                LANJUTKAN ➔
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {indicatorPreviewPage === 'payment' && (
-                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#1e293b', borderRadius: '12px', padding: '16px' }}>
-                                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#f8fafc', marginBottom: '4px' }}>💳 Pembayaran QRIS</div>
-                                            <div style={{ fontSize: '12px', color: '#10b981', fontWeight: 'bold', marginBottom: '12px' }}>Rp 25.000 (1 Sesi)</div>
-                                            <div style={{ width: '130px', height: '130px', background: 'white', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black', fontWeight: 'bold', fontSize: '12px' }}>
-                                                [ QRIS CODE ]
-                                            </div>
-                                            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '12px' }}>Scan dengan GoPay / ShopeePay / BCA</div>
-                                        </div>
-                                    )}
-
-                                    {indicatorPreviewPage === 'capture' && (
-                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#090d16', borderRadius: '12px', padding: '12px', position: 'relative' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#94a3b8', marginBottom: '8px' }}>
-                                                <span>📸 CAMERA LIVE VIEW</span>
-                                                <span style={{ color: '#10b981' }}>🔴 REC 00:03</span>
-                                            </div>
-                                            <div style={{ flex: 1, border: '2px dashed #334155', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                                                <div style={{ fontSize: '64px', fontWeight: '900', color: '#ef4444', textShadow: '0 0 20px rgba(239,68,68,0.8)' }}>3</div>
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', justifyContent: 'center' }}>
-                                                {[1, 2, 3, 4].map(s => (
-                                                    <div key={s} style={{ width: '20px', height: '20px', borderRadius: '50%', background: s === 1 ? '#ef4444' : '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: 'white', fontWeight: 'bold' }}>
-                                                        {s}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {indicatorPreviewPage === 'review' && (
-                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#1e293b', borderRadius: '12px', padding: '12px' }}>
-                                            <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#f8fafc', marginBottom: '8px' }}>🎨 Review & Pilih Filter</div>
-                                            <div style={{ flex: 1, background: '#0f172a', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#64748b' }}>
-                                                [ FOTO RESULT STRIP ]
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', overflowX: 'hidden' }}>
-                                                {['Original', 'B&W', 'Warm', 'Cool'].map(f => (
-                                                    <div key={f} style={{ padding: '4px 10px', borderRadius: '6px', background: f === 'Original' ? '#3b82f6' : '#334155', fontSize: '10px', color: 'white' }}>
-                                                        {f}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {indicatorPreviewPage === 'sharing' && (
-                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#1e293b', borderRadius: '12px', padding: '16px' }}>
-                                            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#f8fafc', marginBottom: '4px' }}>📲 Download Foto Digital</div>
-                                            <div style={{ width: '110px', height: '110px', background: 'white', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black', fontWeight: 'bold', fontSize: '11px', margin: '8px 0' }}>
-                                                [ SCAN QR CODE ]
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '8px' }}>
-                                                <div style={{ padding: '6px 14px', background: '#334155', borderRadius: '6px', fontSize: '12px', color: 'white' }}>- 2 Lembar +</div>
-                                                <div style={{ padding: '6px 16px', background: '#10b981', borderRadius: '6px', fontSize: '12px', color: 'white', fontWeight: 'bold' }}>🖨️ CETAK</div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {indicatorPreviewPage === 'printing' && (
-                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#0f172a', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-                                            <div style={{ fontSize: '36px', marginBottom: '8px' }}>🖨️</div>
-                                            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#f8fafc', marginBottom: '6px' }}>Foto Sedang Dicetak...</div>
-                                            <div style={{ width: '70%', height: '8px', background: '#334155', borderRadius: '999px', overflow: 'hidden', margin: '8px 0' }}>
-                                                <div style={{ width: '65%', height: '100%', background: '#10b981' }} />
-                                            </div>
-                                            <div style={{ fontSize: '11px', color: '#94a3b8' }}>Silakan ambil foto di bagian bawah printer</div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Layout Guidelines: 3x3 Grid Lines */}
-                                {showGridLines && (
-                                    <>
-                                        <div style={{ position: 'absolute', top: '33.33%', left: 0, right: 0, borderTop: '1px dashed rgba(255,255,255,0.15)', pointerEvents: 'none' }} />
-                                        <div style={{ position: 'absolute', top: '66.66%', left: 0, right: 0, borderTop: '1px dashed rgba(255,255,255,0.15)', pointerEvents: 'none' }} />
-                                        <div style={{ position: 'absolute', left: '33.33%', top: 0, bottom: 0, borderLeft: '1px dashed rgba(255,255,255,0.15)', pointerEvents: 'none' }} />
-                                        <div style={{ position: 'absolute', left: '66.66%', top: 0, bottom: 0, borderLeft: '1px dashed rgba(255,255,255,0.15)', pointerEvents: 'none' }} />
-                                    </>
-                                )}
-
-                                {/* Layout Guidelines: Center Lines (50%) */}
-                                {showCenterLines && (
-                                    <>
-                                        <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, borderTop: '1.5px dashed #ef4444', opacity: 0.6, pointerEvents: 'none' }} />
-                                        <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, borderLeft: '1.5px dashed #ef4444', opacity: 0.6, pointerEvents: 'none' }} />
-                                    </>
-                                )}
-
-                                {/* Layout Guidelines: Safety Margin Border Guides (5% & 10%) */}
-                                {showMarginGuides && (
-                                    <>
-                                        <div style={{ position: 'absolute', inset: '5%', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '8px', pointerEvents: 'none' }} />
-                                        <div style={{ position: 'absolute', inset: '10%', border: '1px dashed rgba(16, 185, 129, 0.3)', borderRadius: '8px', pointerEvents: 'none' }} />
-                                    </>
-                                )}
-
-                                {/* Draggable & Resizable Indicator Wrapper */}
-                                <div
-                                    onMouseDown={(e) => handleIndicatorMouseDown('move', e)}
-                                    style={{
-                                        position: 'absolute',
-                                        left: `${config.buttonIndicatorX ?? 80}%`,
-                                        top: `${config.buttonIndicatorY ?? 50}%`,
-                                        width: `${config.buttonIndicatorWidth ?? 260}px`,
-                                        height: `${config.buttonIndicatorHeight ?? 70}px`,
-                                        transform: `translate(-50%, -50%) rotate(${config.buttonIndicatorRotation ?? 0}deg)`,
-                                        transformOrigin: 'center center',
-                                        cursor: indicatorDragMode === 'move' ? 'grabbing' : 'grab',
-                                        zIndex: 10
-                                    }}
-                                >
-                                    {/* Selection Bounding Border & Rotate Handle */}
-                                    <div style={{
-                                        position: 'absolute',
-                                        inset: '-6px',
-                                        border: '2px dashed #3b82f6',
-                                        borderRadius: '12px',
-                                        pointerEvents: 'none'
-                                    }}>
-                                        {/* Rotate Knob Handle */}
-                                        <div
-                                            onMouseDown={(e) => handleIndicatorMouseDown('rotate', e)}
-                                            style={{
-                                                position: 'absolute',
-                                                top: '-28px',
-                                                left: '50%',
-                                                transform: 'translateX(-50%)',
-                                                width: '24px',
-                                                height: '24px',
-                                                borderRadius: '50%',
-                                                backgroundColor: '#3b82f6',
-                                                color: '#ffffff',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '14px',
-                                                cursor: 'grab',
-                                                boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
-                                                pointerEvents: 'auto'
-                                            }}
-                                            title="Tarik untuk memutar indikator (Rotate)"
-                                        >
-                                            ↻
-                                        </div>
-
-                                        {/* Resize Handles (SE, SW, NE, NW) */}
-                                        <div
-                                            onMouseDown={(e) => handleIndicatorMouseDown('resize-nw', e)}
-                                            style={{ position: 'absolute', top: '-6px', left: '-6px', width: '12px', height: '12px', background: '#3b82f6', border: '2px solid white', borderRadius: '50%', cursor: 'nwse-resize', pointerEvents: 'auto' }}
-                                        />
-                                        <div
-                                            onMouseDown={(e) => handleIndicatorMouseDown('resize-ne', e)}
-                                            style={{ position: 'absolute', top: '-6px', right: '-6px', width: '12px', height: '12px', background: '#3b82f6', border: '2px solid white', borderRadius: '50%', cursor: 'nesw-resize', pointerEvents: 'auto' }}
-                                        />
-                                        <div
-                                            onMouseDown={(e) => handleIndicatorMouseDown('resize-sw', e)}
-                                            style={{ position: 'absolute', bottom: '-6px', left: '-6px', width: '12px', height: '12px', background: '#3b82f6', border: '2px solid white', borderRadius: '50%', cursor: 'nesw-resize', pointerEvents: 'auto' }}
-                                        />
-                                        <div
-                                            onMouseDown={(e) => handleIndicatorMouseDown('resize-se', e)}
-                                            style={{ position: 'absolute', bottom: '-6px', right: '-6px', width: '12px', height: '12px', background: '#3b82f6', border: '2px solid white', borderRadius: '50%', cursor: 'nwse-resize', pointerEvents: 'auto' }}
-                                        />
-                                    </div>
-
-                                    {/* Actual Indicator Render Component */}
-                                    <PhysicalButtonIndicator isEditing={true} overridePageKey={indicatorPreviewPage} />
-                                </div>
-                            </div>
-
-                            {/* Guideline Controls Toolbar */}
-                            <div style={{
-                                display: 'flex',
-                                flexWrap: 'wrap',
-                                gap: '16px',
-                                marginTop: '16px',
-                                padding: '12px 16px',
-                                backgroundColor: 'var(--color-bg-secondary, #1f2937)',
-                                borderRadius: '12px',
-                                fontSize: '13px'
-                            }}>
-                                <span style={{ fontWeight: 'bold', alignSelf: 'center' }}>📐 Layout Guidelines:</span>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                                    <input type="checkbox" checked={showGridLines} onChange={(e) => setShowGridLines(e.target.checked)} />
-                                    Grid 3x3
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                                    <input type="checkbox" checked={showCenterLines} onChange={(e) => setShowCenterLines(e.target.checked)} />
-                                    <span style={{ color: '#ef4444' }}>Sumbu Tengah (Center)</span>
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                                    <input type="checkbox" checked={showMarginGuides} onChange={(e) => setShowMarginGuides(e.target.checked)} />
-                                    <span style={{ color: '#3b82f6' }}>Margin Tepi (Safety)</span>
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                                    <input type="checkbox" checked={enableMagneticSnap} onChange={(e) => setEnableMagneticSnap(e.target.checked)} />
-                                    <span style={{ color: '#10b981', fontWeight: 'bold' }}>🧲 Magnetic Snap</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Settings Toolbar Sidebar */}
-                        <div className={styles.timerCard} style={{ gridColumn: '3 / -1' }}>
-                            <h4>⚙️ Pengaturan Teks & Gaya</h4>
-
-                            {/* Text Input */}
-                            <div className={styles.formGroup} style={{ marginBottom: '16px' }}>
-                                <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Teks Penunjuk:</label>
-                                <input
-                                    type="text"
-                                    value={config.buttonIndicatorText || ''}
-                                    onChange={(e) => updateConfig({ buttonIndicatorText: e.target.value })}
-                                    placeholder="TEKAN TOMBOL DI SINI ➔"
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--color-border, #374151)',
-                                        background: 'var(--color-bg-secondary, #1f2937)',
-                                        color: '#ffffff',
-                                        marginTop: '6px'
-                                    }}
-                                />
-                            </div>
-
-                            {/* Shape Selector */}
-                            <div className={styles.formGroup} style={{ marginBottom: '16px' }}>
-                                <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Bentuk / Model:</label>
-                                <select
-                                    value={config.buttonIndicatorShape || 'pill'}
-                                    onChange={(e) => updateConfig({ buttonIndicatorShape: e.target.value as any })}
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        borderRadius: '8px',
-                                        border: '1px solid var(--color-border, #374151)',
-                                        background: 'var(--color-bg-secondary, #1f2937)',
-                                        color: '#ffffff',
-                                        marginTop: '6px'
-                                    }}
-                                >
-                                    <option value="pill">💊 Pill / Capsule (Kapsul Bulat)</option>
-                                    <option value="rectangle">⬛ Sleek Rectangle (Kotak Modern)</option>
-                                    <option value="badge">🏷️ Callout Badge (Tag Melayang)</option>
-                                    <option value="arrow-right">➔ Panah Kanan</option>
-                                    <option value="arrow-left">⬅ Panah Kiri</option>
-                                    <option value="arrow-down">⬇ Panah Bawah</option>
-                                    <option value="arrow-up">⬆ Panah Atas</option>
-                                </select>
-                            </div>
-
-                            {/* Color Quick Presets */}
-                            <div className={styles.formGroup} style={{ marginBottom: '16px' }}>
-                                <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Preset Warna Cepat:</label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                                    {[
-                                        { name: 'Merah', bg: '#ef4444', text: '#ffffff', border: '#ffffff' },
-                                        { name: 'Hijau', bg: '#10b981', text: '#ffffff', border: '#ffffff' },
-                                        { name: 'Biru', bg: '#3b82f6', text: '#ffffff', border: '#ffffff' },
-                                        { name: 'Kuning', bg: '#eab308', text: '#000000', border: '#000000' },
-                                        { name: 'Oranye', bg: '#f97316', text: '#ffffff', border: '#ffffff' },
-                                        { name: 'Ungu', bg: '#8b5cf6', text: '#ffffff', border: '#ffffff' },
-                                        { name: 'Gelap', bg: '#1e293b', text: '#ffffff', border: '#3b82f6' }
-                                    ].map((preset) => (
-                                        <button
-                                            key={preset.name}
-                                            type="button"
-                                            onClick={() => updateConfig({
-                                                buttonIndicatorBgColor: preset.bg,
-                                                buttonIndicatorTextColor: preset.text,
-                                                buttonIndicatorBorderColor: preset.border
-                                            })}
-                                            style={{
-                                                padding: '6px 12px',
-                                                borderRadius: '6px',
-                                                backgroundColor: preset.bg,
-                                                color: preset.text,
-                                                border: `2px solid ${preset.border}`,
-                                                fontSize: '12px',
-                                                fontWeight: 'bold',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            {preset.name}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Custom Color Pickers */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                                <div>
-                                    <label style={{ fontSize: '12px' }}>Warna Background:</label>
-                                    <input
-                                        type="color"
-                                        value={config.buttonIndicatorBgColor || '#ef4444'}
-                                        onChange={(e) => updateConfig({ buttonIndicatorBgColor: e.target.value })}
-                                        style={{ width: '100%', height: '36px', borderRadius: '6px', cursor: 'pointer', border: 'none', marginTop: '4px' }}
-                                    />
-                                </div>
-                                <div>
-                                    <label style={{ fontSize: '12px' }}>Warna Teks:</label>
-                                    <input
-                                        type="color"
-                                        value={config.buttonIndicatorTextColor || '#ffffff'}
-                                        onChange={(e) => updateConfig({ buttonIndicatorTextColor: e.target.value })}
-                                        style={{ width: '100%', height: '36px', borderRadius: '6px', cursor: 'pointer', border: 'none', marginTop: '4px' }}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Rotation & Size Sliders */}
-                            <div className={styles.formGroup} style={{ marginBottom: '16px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                                    <label style={{ fontWeight: 'bold' }}>Rotasi Sudut (Rotate):</label>
-                                    <span>{config.buttonIndicatorRotation ?? 0}°</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="360"
-                                    value={config.buttonIndicatorRotation ?? 0}
-                                    onChange={(e) => updateConfig({ buttonIndicatorRotation: Number(e.target.value) })}
-                                    style={{ width: '100%', marginTop: '6px' }}
-                                />
-                            </div>
-
-                            {/* Font Size Slider */}
-                            <div className={styles.formGroup} style={{ marginBottom: '16px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                                    <label style={{ fontWeight: 'bold' }}>Ukuran Font:</label>
-                                    <span>{config.buttonIndicatorFontSize ?? 16}px</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="12"
-                                    max="32"
-                                    value={config.buttonIndicatorFontSize ?? 16}
-                                    onChange={(e) => updateConfig({ buttonIndicatorFontSize: Number(e.target.value) })}
-                                    style={{ width: '100%', marginTop: '6px' }}
-                                />
-                            </div>
-
-                            {/* Pulse Animation Toggle */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                <div>
-                                    <span style={{ fontWeight: 'bold', fontSize: '14px' }}>✨ Animasi Denyut (Pulse Glow)</span>
-                                    <p style={{ fontSize: '12px', opacity: 0.6, margin: '2px 0 0 0' }}>Bikin penunjuk terus berdenyut untuk menarik perhatian</p>
-                                </div>
+                            <h3>Panduan Tombol Fisik</h3>
+                            <p>Rail di tepi kanan layar menunjukkan fungsi tombol 1, 2, 3 di setiap halaman. Tombol 3 selalu berarti lanjut / OK. Tekanan ganda dari tombol yang memantul (bounce) otomatis diabaikan.</p>
+                            <div className={styles.timerToggle}>
                                 <label className={styles.toggleSwitch}>
                                     <input
                                         type="checkbox"
-                                        checked={config.buttonIndicatorPulse ?? true}
-                                        onChange={(e) => updateConfig({ buttonIndicatorPulse: e.target.checked })}
+                                        checked={config.buttonRailEnabled !== false}
+                                        onChange={(e) => updateConfig({ buttonRailEnabled: e.target.checked })}
                                     />
                                     <span className={styles.toggleSlider}></span>
                                 </label>
+                                <span className={styles.toggleLabel}>
+                                    {config.buttonRailEnabled !== false ? 'Rail tombol tampil' : 'Rail tombol disembunyikan'}
+                                </span>
                             </div>
                         </div>
+                        <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
+                            <h3>Maskot Asisten (mode layar sentuh)</h3>
+                            <p>Maskot di pojok kanan bawah bisa diketuk untuk tips sesuai halaman, memberi petunjuk saat halaman baru terbuka, dan menyapa kalau pelanggan diam ±10 detik. Kalau mati, maskot hanya hiasan dan pemandu transisi.</p>
+                            <div className={styles.timerToggle}>
+                                <label className={styles.toggleSwitch}>
+                                    <input
+                                        type="checkbox"
+                                        checked={!!config.mascotAssistant}
+                                        onChange={(e) => updateConfig({ mascotAssistant: e.target.checked })}
+                                    />
+                                    <span className={styles.toggleSlider}></span>
+                                </label>
+                                <span className={styles.toggleLabel}>
+                                    {config.mascotAssistant ? 'Maskot asisten aktif' : 'Maskot asisten mati'}
+                                </span>
+                            </div>
+                        </div>
+                        {[0, 1, 2].map((i) => {
+                            const positions = config.buttonRailPositions || [22, 50, 78]
+                            return (
+                                <div key={i} className={styles.timerCard}>
+                                    <h3>Posisi tombol {i + 1}</h3>
+                                    <p>Geser sampai label sejajar dengan tombol fisik di samping layar.</p>
+                                    <div className={styles.timerInput}>
+                                        <input
+                                            type="range"
+                                            min={5}
+                                            max={95}
+                                            value={positions[i]}
+                                            onChange={(e) => {
+                                                const next = [...positions] as [number, number, number]
+                                                next[i] = Number(e.target.value)
+                                                updateConfig({ buttonRailPositions: next })
+                                            }}
+                                        />
+                                        <span className={styles.timerValue}>{positions[i]}%</span>
+                                    </div>
+                                </div>
+                            )
+                        })}
                     </div>
                 )}
 

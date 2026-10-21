@@ -1,129 +1,86 @@
 .container {
-    width: 100vw;
+    width: 100%;
     height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    background: var(--clay-yellow); /* Amber yellow — festive */
     position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: #FFFFFF;
     overflow: hidden;
 }
 
-/* Decorative circle top right */
-.container::before {
-    content: '';
-    position: absolute;
-    width: 60vw;
-    height: 60vw;
-    top: -25%;
-    right: -20%;
-    background: rgba(255,255,255,0.1);
-    border-radius: 50%;
-    pointer-events: none;
-}
-
-.videoBackground {
-    position: absolute;
-    top: 50%; left: 50%;
-    min-width: 100%; min-height: 100%;
-    width: auto; height: auto;
-    z-index: 1;
-    transform: translateX(-50%) translateY(-50%);
-    object-fit: cover;
-    opacity: 0.15;
-}
-
-.overlay { display: none; }
-
-/* Floating white content card */
 .content {
-    position: relative;
-    z-index: 10;
     display: flex;
     flex-direction: column;
     align-items: center;
-    color: #1A1A2E;
-    background: #FFFFFF;
-    padding: var(--spacing-3xl);
-    border-radius: var(--radius-2xl);
-    box-shadow: var(--clay-shadow-xl);
-    min-width: 360px;
+    gap: 18px;
+    padding: 48px;
+    text-align: center;
+}
+
+.logo {
+    width: min(48vw, 640px);
+    margin-bottom: 8px;
 }
 
 .title {
-    font-size: 52px;
-    font-weight: 900;
-    margin-bottom: var(--spacing-md);
-    text-transform: uppercase;
-    letter-spacing: 2px;
-    color: #1A1A2E;
+    font-size: 120px;
 }
-
-@keyframes soft-pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.04); opacity: 0.85; }
-}
-
-.title { animation: soft-pulse 2.2s ease-in-out infinite; }
 
 .subtitle {
-    font-size: var(--font-size-xl);
-    color: var(--color-text-secondary);
+    font-size: 26px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.pickupCode {
+    margin-top: 8px;
+    padding: 20px 56px;
+    border-radius: var(--sticker-radius);
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    font-size: 150px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    border: 6px solid var(--brand-ink);
+    box-shadow: 0 12px 0 var(--brand-ink);
+    transform: rotate(-2deg);
+}
+
+.pickupWarning {
+    max-width: 36ch;
+    font-size: 20px;
     font-weight: 700;
-    margin-top: var(--spacing-sm);
+    color: #FFD9C7;
 }
-
-/* Blue loading spinner */
-.loadingSpinner {
-    margin-top: var(--spacing-2xl);
-    width: 72px;
-    height: 72px;
-    border: 7px solid var(--clay-cream);
-    border-top-color: var(--clay-blue);
-    border-radius: 50%;
-    animation: spin 0.75s linear infinite;
-    box-shadow: var(--clay-shadow-blue);
-}
-
-@keyframes spin { 100% { transform: rotate(360deg); } }
 
 .errorMessage {
     position: absolute;
-    top: 40px;
-    background: var(--clay-coral);
-    color: #FFFFFF;
-    padding: var(--spacing-md) var(--spacing-xl);
+    top: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 24px;
     border-radius: var(--radius-full);
-    z-index: 100;
+    background: var(--brand-orange);
+    border: 3px solid var(--brand-ink);
+    color: #FFFFFF;
+    font-size: 18px;
     font-weight: 800;
-    box-shadow: var(--clay-shadow-coral);
-}
-
-/* ── PORTRAIT MODE OVERRIDES ── */
-:global(body.app-portrait) .container {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100vh !important;
-}
-
-:global(body.app-portrait) .content {
-    min-width: 85% !important;
-    padding: var(--spacing-2xl) !important;
-    text-align: center !important;
+    z-index: 10;
 }
 
 :global(body.app-portrait) .title {
-    font-size: 38px !important;
+    font-size: 96px;
+    line-height: 0.9;
 }
 
-:global(body.app-portrait) .subtitle {
-    font-size: var(--font-size-lg) !important;
+:global(body.app-portrait) .logo {
+    width: 80%;
 }
 
-:global(body.app-portrait) .loadingSpinner {
-    width: 64px !important;
-    height: 64px !important;
+:global(body.app-portrait) .pickupCode {
+    font-size: 120px;
+    padding: 18px 40px;
 }
-
-

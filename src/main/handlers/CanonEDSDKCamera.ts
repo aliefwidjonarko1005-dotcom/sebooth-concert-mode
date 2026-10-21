@@ -41,6 +41,10 @@ export class CanonEDSDKCamera extends CameraHandler {
     private liveViewTempPath: string
     private detectedCameraName: string = ''
     private helperProcess: ChildProcess | null = null
+    private connectPromise: Promise<boolean> | null = null
+    private isShutdown = false
+    private recovering = false
+    private keepAliveTimer: NodeJS.Timeout | null = null
 
     constructor() {
         super()
@@ -341,6 +345,14 @@ try {
     }
 
     async connect(cameraId: string): Promise<boolean> {
+        // Concurrent callers (startup auto-connect, startLiveView, Landing) share one spawn:
+        // two CanonHelper.exe processes = "Comm Port Is In Use".
+        if (this.connectPromise) return this.connectPromise
+        this.connectPromise = this.connectInternal(cameraId).finally(() => { this.connectPromise = null })
+        return this.connectPromise
+    }
+
+    private async connectInternal(cameraId: string): Promise<boolean> {
         console.log(`[CanonEDSDK] Connecting to camera: ${cameraId}`)
 
         if (this.connected && this.helperProcess) {
@@ -357,6 +369,11 @@ try {
 
         await this.killConflictingApps()
         await new Promise(resolve => setTimeout(resolve, 500))
+
+        if (this.isShutdown) {
+            console.log('[CanonEDSDK] Handler was shut down while connecting. Not spawning helper.')
+            return false
+        }
 
         const exePath = join(this.canonLibPath, 'CanonHelper.exe')
         console.log(`[CanonEDSDK] Spawning helper process: ${exePath}`)
@@ -379,6 +396,16 @@ try {
                     console.error(`[CanonHelper stderr] ${data.toString().trim()}`)
                 })
 
+                // EDSDK can block forever (camera asleep / device held by another app) without
+                // printing anything; never let connect() hang the capture page.
+                setTimeout(() => {
+                    if (isResolved) return
+                    isResolved = true
+                    console.warn('[CanonEDSDK] Helper did not report CONNECTED within 15s. Killing it.')
+                    try { helper.kill() } catch (e) {}
+                    reject(new Error('Kamera Canon tidak merespons (timeout 15 dtk)'))
+                }, 15000)
+
                 helper.stdout.on('data', (data) => {
                     buffer += data.toString()
                     let index = buffer.indexOf('\n')
@@ -400,6 +427,7 @@ try {
                                 connected: true
                             }
                             isResolved = true
+                            this.startKeepAlive()
                             resolve(true)
                         } else if (line.startsWith('ERROR:')) {
                             const err = line.substring(6).trim()
@@ -407,6 +435,13 @@ try {
                                 isResolved = true
                                 reject(new Error(err))
                             }
+                        }
+
+                        // Camera power-cycled / auto-off / USB blip: the EDSDK session is dead for good
+                        // (0x61 = EDS_ERR_INVALID_HANDLE). Respawn the helper instead of failing forever.
+                        if (isResolved && this.helperProcess === helper &&
+                            (line.includes('Invalid Handle') || line.includes('KEEPALIVE err=0x61'))) {
+                            this.recoverStaleHelper(cameraId)
                         }
                     }
                 })
@@ -421,9 +456,13 @@ try {
 
                 helper.on('close', (code) => {
                     console.log(`[CanonEDSDK] Helper process exited with code ${code}`)
-                    this.connected = false
-                    this.currentCamera = null
-                    this.helperProcess = null
+                    // An old helper exiting must not wipe the state of a newer one.
+                    if (this.helperProcess === helper) {
+                        this.stopKeepAlive()
+                        this.connected = false
+                        this.currentCamera = null
+                        this.helperProcess = null
+                    }
                     if (!isResolved) {
                         isResolved = true
                         reject(new Error(`Helper process exited unexpectedly with code ${code}`))
@@ -435,7 +474,51 @@ try {
         })
     }
 
+    private recoverStaleHelper(cameraId: string): void {
+        if (this.recovering || this.isShutdown) return
+        this.recovering = true
+        const restartLiveView = this.liveViewActive
+        console.warn('[CanonEDSDK] Camera session lost (Invalid Handle). Reconnecting helper...')
+        setTimeout(async () => {
+            try {
+                await this.disconnect()
+                await new Promise(resolve => setTimeout(resolve, 1500)) // let the old helper release the COM port
+                const ok = await this.connect(cameraId)
+                if (ok && restartLiveView) await this.startLiveView()
+                console.log(`[CanonEDSDK] Reconnect ${ok ? 'succeeded' : 'failed'}`)
+            } catch (e: any) {
+                console.error('[CanonEDSDK] Reconnect failed:', e.message)
+            } finally {
+                this.recovering = false
+            }
+        }, 0)
+    }
+
+    /**
+     * Ping the body every 45 s (EdsSendCommand ExtendShutDownTimer) so auto power-off never kicks in
+     * while the booth waits for the next customer. Skipped while USB frames are being recorded.
+     */
+    private startKeepAlive(): void {
+        this.stopKeepAlive()
+        this.keepAliveTimer = setInterval(() => {
+            if (!this.helperProcess || !this.connected || this.recordingTimer) return
+            try {
+                this.helperProcess.stdin?.write('KEEPALIVE\n')
+            } catch (e) {
+                console.warn('[CanonEDSDK] Keep-alive write failed:', e)
+            }
+        }, 45000)
+    }
+
+    private stopKeepAlive(): void {
+        if (this.keepAliveTimer) {
+            clearInterval(this.keepAliveTimer)
+            this.keepAliveTimer = null
+        }
+    }
+
     async disconnect(): Promise<void> {
+        this.stopKeepAlive()
         if (this.helperProcess) {
             console.log('[CanonEDSDK] Disconnecting helper process...')
             try {
@@ -484,6 +567,12 @@ try {
     }
 
     private async captureInternal(outputPath: string, options?: { allowLiveViewFallback?: boolean }): Promise<CaptureResult> {
+        if (!this.helperProcess) {
+            // Helper died or is being respawned after a lost session: wait for / start a connect.
+            try { await this.connect('canon_edsdk_0') } catch (e: any) {
+                console.warn('[CanonEDSDK] Auto-connect before capture failed:', e.message)
+            }
+        }
         const helper = this.helperProcess
         if (!helper) {
             return {
@@ -1028,6 +1117,7 @@ try {
      * Shutdown the Canon EDSDK handler
      */
     async shutdown(): Promise<void> {
+        this.isShutdown = true
         await this.disconnect()
 
         // Clean up temp live view file

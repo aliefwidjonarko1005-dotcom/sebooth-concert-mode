@@ -71,15 +71,6 @@ export function SessionTimer({ duration, onTimeout, enabled, label = 'Session' }
             >
                 <span className={styles.timerLabel}>{label}</span>
                 <span className={styles.timerValue}>{formatTime(timeLeft)}</span>
-                {isWarning && (
-                    <motion.span
-                        className={styles.warningIcon}
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ repeat: Infinity, duration: 0.5 }}
-                    >
-                        ⚠️
-                    </motion.span>
-                )}
             </motion.div>
         </AnimatePresence>
     )

@@ -5,17 +5,31 @@ import { useSessionStore, useFrameStore, useAppConfig } from '../stores'
 import { SessionTimer } from '../components/SessionTimer'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './PhotoReviewPage.module.css'
+import { useSwipe } from '../lib/useSwipe'
+import { useElementSize } from '../lib/useElementHeight'
+import { useButtonHints, useInputMode } from '../components/ButtonRail/ButtonRail'
 
 function PhotoReviewPage(): JSX.Element | null {
     const navigate = useNavigate()
-    const { currentSession, photos, removePhoto, endSession } = useSessionStore()
+    const { currentSession, photos, removePhoto, endSession, deadline } = useSessionStore()
     const { frames } = useFrameStore()
     const { config } = useAppConfig()
+    const isConcert = !!config.concertMode
+    const nextRoute = isConcert ? '/finalize' : '/review'
+    // Concert mode shares one countdown with CaptureSession (computed once on mount)
+    const [concertSecondsLeft] = useState(() =>
+        deadline ? Math.max(1, Math.ceil((deadline - Date.now()) / 1000)) : config.concertSessionSeconds || 240
+    )
 
     const [activeIndex, setActiveIndex] = useState(0)
     const [scale, setScale] = useState(1)
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
+    const bottomRef = useRef<HTMLDivElement>(null)
+    const bottomSize = useElementSize(bottomRef)
+    const touch = useInputMode() === 'touch'
+    // Both booths show only the active photo (neighbours were cut off at the screen edge)
+    const single = touch || config.appOrientation === 'portrait'
 
     // Redirect if no session or photos
     useEffect(() => {
@@ -49,6 +63,11 @@ function PhotoReviewPage(): JSX.Element | null {
     }, [sessionFrame])
 
     // Button 1: Next Foto Slide
+    const handlePrevSlide = useCallback(() => {
+        if (captureSlots.length === 0) return
+        setActiveIndex(prev => (prev - 1 + captureSlots.length) % captureSlots.length)
+    }, [captureSlots.length])
+
     const handleNextSlide = useCallback(() => {
         if (captureSlots.length === 0) return
         setActiveIndex(prev => (prev + 1) % captureSlots.length)
@@ -57,16 +76,17 @@ function PhotoReviewPage(): JSX.Element | null {
     // Button 2: Retake Active Photo
     const handleRetakePhoto = useCallback(() => {
         if (captureSlots.length === 0 || !captureSlots[activeIndex]) return
+        if (isConcert && deadline && Date.now() >= deadline) return
         const activeSlot = captureSlots[activeIndex]
         const sourceSlotId = activeSlot.duplicateOfSlotId || activeSlot.id
         removePhoto(sourceSlotId)
         navigate('/capture')
-    }, [captureSlots, activeIndex, removePhoto, navigate])
+    }, [captureSlots, activeIndex, removePhoto, navigate, isConcert, deadline])
 
     // Button 3: Continue to next page (/review for post processing)
     const handleContinue = useCallback(() => {
-        navigate('/review')
-    }, [navigate])
+        navigate(nextRoute)
+    }, [navigate, nextRoute])
 
     // Physical Hardware Keyboard Shortcuts (Key 1 = Next, Key 2 = Retake, Key 3 = Continue)
     useEffect(() => {
@@ -91,8 +111,8 @@ function PhotoReviewPage(): JSX.Element | null {
 
     // Timeout handler
     const handleTimeout = useCallback(() => {
-        navigate('/review')
-    }, [navigate])
+        navigate(nextRoute)
+    }, [navigate, nextRoute])
 
     const handleBackHome = () => {
         setIsConfirmModalOpen(true)
@@ -102,6 +122,15 @@ function PhotoReviewPage(): JSX.Element | null {
         endSession()
         navigate('/')
     }
+
+    const retakeLocked = isConcert && !!deadline && Date.now() >= deadline
+    const swipe = useSwipe(handlePrevSlide, handleNextSlide, touch && captureSlots.length > 1)
+
+    useButtonHints({
+        1: captureSlots.length > 1 ? { label: 'Foto berikutnya', onScreen: true } : null,
+        2: retakeLocked ? null : { label: 'Ulangi foto ini' },
+        3: { label: isConcert ? 'Lanjut cetak' : 'Lanjut', primary: true }
+    })
 
     if (!currentSession || !sessionFrame) return null
 
@@ -113,18 +142,20 @@ function PhotoReviewPage(): JSX.Element | null {
             exit={{ opacity: 0 }}
         >
             <SessionTimer
-                duration={config.postProcessingTimeout || 120}
+                duration={isConcert ? concertSecondsLeft : config.postProcessingTimeout || 120}
                 onTimeout={handleTimeout}
-                enabled={config.sessionTimerEnabled}
-                label="Review Photos"
+                enabled={isConcert || config.sessionTimerEnabled}
+                label={isConcert ? 'Sisa Waktu' : 'Review Photos'}
             />
 
             <div className={styles.content}>
                 <header className={styles.header}>
-                    <button onClick={handleBackHome} className={styles.backBtn}>
-                        ← Beranda
-                    </button>
-                    <h1>Review Your Photos</h1>
+                    <div>
+                        <h1 className="kiosk-title">
+                            Foto <em className="kiosk-num">{activeIndex + 1}</em> <span className="kiosk-num">/ {captureSlots.length}</span>
+                        </h1>
+                    </div>
+                    <button onClick={handleBackHome} className={styles.backBtn}>Batal</button>
                 </header>
 
                 {/* Single Unified Container Card */}
@@ -186,12 +217,9 @@ function PhotoReviewPage(): JSX.Element | null {
                         </div>
                     </div>
 
-                    {/* Subtle Section Divider Line */}
-                    <div className={styles.sectionDivider} />
-
                     {/* Bottom Portion: Maximized Centered 3D Sliding Carousel for Individual Photos */}
-                    <div className={styles.bottomSection}>
-                        <div className={styles.carouselContainer}>
+                    <div className={styles.bottomSection} ref={bottomRef}>
+                        <motion.div className={styles.carouselContainer} {...swipe}>
                             <div className={styles.carouselCenterTrack}>
                                 {captureSlots.map((slot, index) => {
                                     const sourceSlotId = slot.duplicateOfSlotId || slot.id
@@ -199,15 +227,21 @@ function PhotoReviewPage(): JSX.Element | null {
                                     const offset = index - activeIndex
                                     const isCenter = index === activeIndex
 
-                                    // Vertical (portrait 2:3 aspect ratio) card dimensions
+                                    // Cards keep the slot's own aspect ratio so nothing important is cropped
                                     const isPortraitMode = config.appOrientation === 'portrait'
-                                    const cardHeight = isPortraitMode ? 260 : 280
-                                    const cardWidth = Math.round(cardHeight * (2 / 3)) // ~173px in portrait, ~187px in landscape (vertical)
+                                    const slotAspect = captureSlots[0] ? captureSlots[0].width / captureSlots[0].height : 1.5
+                                    // Touch booth: the card fills the measured section; only the active photo shows,
+                                    // neighbours wait off to the side (transparent) so a swipe glides them in
+                                    const touchCardHeight = bottomSize.height > 0
+                                        ? Math.min((bottomSize.height * 0.8) / 1.1, (bottomSize.width * 0.84) / 1.1 / slotAspect)
+                                        : 400
+                                    const cardHeight = single ? Math.round(touchCardHeight) : isPortraitMode ? 380 : 400
+                                    const cardWidth = Math.round(cardHeight * slotAspect)
 
-                                    const cardSpacing = cardWidth + 50
+                                    const cardSpacing = single ? cardWidth * 1.3 : cardWidth * 0.85
                                     const translateX = offset * cardSpacing
-                                    const cardScale = isCenter ? 1.3 : Math.max(0.65, 1 - Math.abs(offset) * 0.3)
-                                    const cardOpacity = isCenter ? 1 : Math.max(0.35, 1 - Math.abs(offset) * 0.4)
+                                    const cardScale = isCenter ? 1.1 : single ? 0.88 : Math.max(0.55, 0.8 - Math.abs(offset) * 0.2)
+                                    const cardOpacity = isCenter ? 1 : single ? 0 : Math.max(0.35, 1 - Math.abs(offset) * 0.4)
                                     const zIndex = 100 - Math.abs(offset)
 
                                     if (Math.abs(offset) > 3) return null
@@ -216,7 +250,7 @@ function PhotoReviewPage(): JSX.Element | null {
                                         <motion.div
                                             key={slot.id}
                                             className={`${styles.carouselCard} ${isCenter ? styles.centerCard : styles.sideCard}`}
-                                            onClick={() => setActiveIndex(index)}
+                                            onClick={touch ? undefined : () => setActiveIndex(index)}
                                             style={{
                                                 width: `${cardWidth}px`,
                                                 height: `${cardHeight}px`,
@@ -243,14 +277,21 @@ function PhotoReviewPage(): JSX.Element | null {
                                                         className={styles.cardImage}
                                                     />
                                                 ) : (
-                                                    <div className={styles.cardPlaceholder}>Tidak Ada Foto</div>
+                                                    <div className={styles.cardPlaceholder}>Belum ada foto</div>
                                                 )}
                                             </div>
                                         </motion.div>
                                     )
                                 })}
                             </div>
-                        </div>
+                        </motion.div>
+                        {single && captureSlots.length > 1 && (
+                            <div className={styles.touchDots} aria-hidden="true">
+                                {captureSlots.map((slot, i) => (
+                                    <span key={slot.id} className={i === activeIndex ? styles.touchDotActive : styles.touchDot} />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

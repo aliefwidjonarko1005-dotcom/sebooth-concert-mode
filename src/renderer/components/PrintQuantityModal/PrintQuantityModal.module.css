@@ -2,7 +2,7 @@
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
+    right: var(--rail-w); /* stop at the button rail */
     bottom: 0;
     background: rgba(0, 0, 0, 0.7);
     display: flex;
@@ -138,4 +138,61 @@
 
 .confirmBtn:hover {
     background: #0056b3;
+}
+
+/* ── Cartoon sticker skin (overrides the generic look above) ── */
+.modal {
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    border: 5px solid var(--brand-ink);
+    border-radius: var(--sticker-radius);
+    box-shadow: 12px 14px 0 var(--brand-orange), 12px 14px 0 5px var(--brand-ink);
+}
+
+.title {
+    color: var(--brand-ink);
+    font-weight: 900;
+}
+
+.closeBtn {
+    color: var(--brand-ink);
+}
+
+.cancelBtn,
+.confirmBtn {
+    border: var(--ink-line);
+    border-radius: var(--radius-full);
+    box-shadow: var(--sticker-shadow-sm);
+    font-weight: 900;
+}
+
+.cancelBtn,
+.cancelBtn:hover {
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    box-shadow: none;
+}
+
+.confirmBtn,
+.confirmBtn:hover {
+    background: var(--brand-orange);
+    color: #FFFFFF;
+}
+
+.cancelBtn:active,
+.confirmBtn:active {
+    transform: translateY(3px);
+    box-shadow: var(--sticker-shadow-pressed);
+}
+
+.quantityBtn,
+.quantityBtn:hover:not(:disabled) {
+    border: var(--ink-line);
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    box-shadow: var(--sticker-shadow-sm);
+}
+
+.quantityBtn:hover:not(:disabled) {
+    background: var(--brand-sun);
 }

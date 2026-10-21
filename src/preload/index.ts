@@ -101,7 +101,7 @@ const api = {
         },
 
         // Remote Printing (Double Device)
-        remotePrint: (options: { imageData: string; copies: number; sessionId: string }): Promise<APIResponse<{ jobId?: string }>> =>
+        remotePrint: (options: { imageData: string; copies: number; sessionId: string; label?: string }): Promise<APIResponse<{ jobId?: string; queued?: boolean }>> =>
             ipcRenderer.invoke('printer:remote-print', options),
 
         checkPrintServer: (serverUrl?: string): Promise<APIResponse<any>> =>
@@ -165,6 +165,14 @@ const api = {
 
         generateHqGif: (framesBase64: string[], delayMs: number): Promise<APIResponse<string>> =>
             ipcRenderer.invoke('system:generate-hq-gif', framesBase64, delayMs),
+
+        // Fire-and-forget: GIF + local save + cloud upload queue run in the main process
+        finalizeSession: (params: {
+            save: Record<string, unknown> & { sessionId: string }
+            gifFrames?: string[]
+            upload?: { eventName: string; frameName: string }
+        }): Promise<APIResponse<void>> =>
+            ipcRenderer.invoke('system:finalize-session', params),
 
         renameSessionFolder: (params: { sessionId: string; email: string }): Promise<APIResponse<string>> =>
             ipcRenderer.invoke('system:rename-session-folder', params),

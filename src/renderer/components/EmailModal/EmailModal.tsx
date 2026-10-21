@@ -66,7 +66,7 @@ export function EmailModal({ isOpen, onClose, onSend, isSending }: EmailModalPro
                         ×
                     </button>
 
-                    <h2 className={styles.title}>📧 Send to Email</h2>
+                    <h2 className={styles.title}>Send to Email</h2>
                     <p className={styles.subtitle}>
                         Receive your photos directly in your inbox
                     </p>
@@ -94,7 +94,7 @@ export function EmailModal({ isOpen, onClose, onSend, isSending }: EmailModalPro
 
                             {error && (
                                 <div className={styles.error}>
-                                    <span>⚠️</span> {error}
+                                    <span></span> {error}
                                 </div>
                             )}
 
@@ -109,7 +109,7 @@ export function EmailModal({ isOpen, onClose, onSend, isSending }: EmailModalPro
                                         Sending...
                                     </>
                                 ) : (
-                                    <>📨 Send Photos</>
+                                    <>Send Photos</>
                                 )}
                             </button>
 

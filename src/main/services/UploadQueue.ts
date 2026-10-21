@@ -5,6 +5,11 @@ import crypto from 'crypto';
 
 export interface QueuedUpload {
   id: string;
+  // 'db' items are Supabase rows, processed in order after the files queued before them
+  kind?: 'file' | 'db';
+  table?: string;
+  row?: Record<string, unknown>;
+  onConflict?: string;
   bucketName: string;
   destinationPath: string;
   filePath: string;
@@ -76,6 +81,23 @@ export class UploadQueueService {
       console.log(`[UploadQueue] Enqueued offline item: ${uploadItem.destinationPath}. Total pending: ${this.queue.length}`);
   }
 
+  public enqueueRow(table: string, row: Record<string, unknown>, onConflict?: string): void {
+      this.queue.push({
+          id: crypto.randomUUID(),
+          kind: 'db',
+          table,
+          row,
+          onConflict,
+          bucketName: '',
+          destinationPath: `${table}`,
+          filePath: '',
+          mimeType: '',
+          addedAt: Date.now(),
+          retries: 0
+      });
+      this.saveQueue();
+  }
+
   public getPendingQueue(): QueuedUpload[] {
       return [...this.queue];
   }
@@ -89,7 +111,7 @@ export class UploadQueueService {
           this.saveQueue();
 
           // Cleanup temp file if it was generated purely for offline cache
-          if (item.filePath.includes('OfflineCache') && fs.existsSync(item.filePath)) {
+          if (item.filePath && item.filePath.includes('OfflineCache') && fs.existsSync(item.filePath)) {
               fs.unlinkSync(item.filePath);
           }
           console.log(`[UploadQueue] Successfully removed ${id} from queue.`);

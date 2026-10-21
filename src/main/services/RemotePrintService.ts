@@ -1,18 +1,23 @@
 import http from 'http'
 import https from 'https'
 import { URL } from 'url'
+import fs from 'fs'
+import path from 'path'
+import { app } from 'electron'
 
 export interface RemotePrintRequest {
     imageData: string      // base64 data URL
     copies: number
     sessionId: string
     deviceName: string
+    label?: string
 }
 
 export interface RemotePrintResponse {
     success: boolean
     jobId?: string
     error?: string
+    queued?: boolean // server unreachable: saved to disk, resent in the background
 }
 
 export interface PrintServerStatus {
@@ -69,6 +74,81 @@ export class RemotePrintService {
                     error: `Gagal mengirim ke Print Server: ${retryErr.message || 'Connection failed'}`
                 }
             }
+        }
+    }
+
+    private pendingDir(): string {
+        const dir = path.join(app.getPath('userData'), 'pending_prints')
+        fs.mkdirSync(dir, { recursive: true })
+        return dir
+    }
+
+    /**
+     * Send once; if the server can't be reached, persist the job and let flushPending() resend it.
+     * The server drops duplicates by sessionId, so resending is safe.
+     */
+    public async sendOrQueue(request: RemotePrintRequest): Promise<RemotePrintResponse> {
+        try {
+            const result = await this.httpPost(`${this.serverUrl}/api/remote-print`, request, 15000)
+            if (result?.success) return result
+            console.warn(`[RemotePrintService] Server rejected job, queueing:`, result?.error)
+        } catch (err: any) {
+            console.warn(`[RemotePrintService] Print server unreachable, queueing job ${request.sessionId}:`, err.message)
+        }
+        try {
+            fs.writeFileSync(path.join(this.pendingDir(), `${request.sessionId}.json`), JSON.stringify(request))
+            return { success: true, queued: true }
+        } catch (e: any) {
+            return { success: false, error: `Gagal menyimpan antrean cetak: ${e.message}` }
+        }
+    }
+
+    private isFlushing = false
+
+    /** Resend persisted jobs in arrival order. Stops at the first failure (server still down). */
+    public async flushPending(): Promise<void> {
+        if (this.isFlushing || !this.serverUrl) return
+        this.isFlushing = true
+        try {
+            const dir = this.pendingDir()
+            const files = fs.readdirSync(dir)
+                .filter(f => f.endsWith('.json'))
+                .map(f => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
+                .sort((a, b) => a.t - b.t)
+            for (const { f } of files) {
+                const full = path.join(dir, f)
+                const request = JSON.parse(fs.readFileSync(full, 'utf8')) as RemotePrintRequest
+                try {
+                    const result = await this.httpPost(`${this.serverUrl}/api/remote-print`, request, 15000)
+                    if (!result?.success) break
+                    fs.unlinkSync(full)
+                    console.log(`[RemotePrintService] Delivered queued job ${request.sessionId}`)
+                } catch {
+                    break
+                }
+            }
+        } catch (e) {
+            console.error('[RemotePrintService] flushPending error:', e)
+        } finally {
+            this.isFlushing = false
+        }
+    }
+
+    /** Tell the print server this booth is alive and how many prints are still waiting here. Best effort. */
+    public async sendHeartbeat(deviceName: string, boothCode?: string): Promise<void> {
+        if (!this.serverUrl) return
+        try {
+            await this.httpPost(`${this.serverUrl}/api/print/heartbeat`, { deviceName, boothCode, pending: this.pendingCount() }, 5000)
+        } catch {
+            // server offline: the loket will show this booth as not seen recently
+        }
+    }
+
+    public pendingCount(): number {
+        try {
+            return fs.readdirSync(this.pendingDir()).filter(f => f.endsWith('.json')).length
+        } catch {
+            return 0
         }
     }
 

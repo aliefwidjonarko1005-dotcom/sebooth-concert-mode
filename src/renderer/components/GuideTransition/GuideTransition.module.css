@@ -1,0 +1,134 @@
+/* Page-change act by the mascot guide (touch / landscape only, mounted from App.tsx) */
+.stage {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: var(--rail-w); /* never over the button rail */
+    z-index: 950; /* above pages and the touch dock (850), below dialogs (1000) */
+    pointer-events: none;
+    overflow: hidden;
+}
+
+/* ── Curtains: flat orange drapes with ink seams and darker folds ── */
+.curtain {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 51%;
+    background: var(--brand-orange);
+    border: 6px solid var(--brand-ink);
+}
+
+.curtainLeft {
+    left: 0;
+    border-left: none;
+}
+
+.curtainRight {
+    right: 0;
+    border-right: none;
+}
+
+.folds {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.valance {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 96px;
+}
+
+.valanceSvg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* ── Flash: plain white, faded by the component ── */
+.flash {
+    position: absolute;
+    inset: 0;
+    background: #FFFFFF;
+}
+
+/* ── Print: a giant strip covering the page, fed out of the top ── */
+.print {
+    position: absolute;
+    top: 3vh;
+    bottom: -3vh;
+    left: 50%;
+    width: min(62vh, 80%); /* % of the stage, which stops at the button rail */
+    margin-left: calc(min(62vh, 80%) / -2);
+    display: flex;
+    flex-direction: column;
+    gap: 2.4vh;
+    padding: 3vh 3vh 9vh;
+    background: #FFFFFF;
+    border: 6px solid var(--brand-ink);
+    border-radius: 12px;
+}
+
+.printBackdrop {
+    position: absolute;
+    inset: 0;
+    background: var(--brand-royal);
+}
+
+.printFrame {
+    flex: 1;
+    border: 4px solid var(--brand-ink);
+    border-radius: 6px;
+}
+
+/* ── The guide: mascot with a speech bubble, bottom centre ── */
+.guide {
+    position: absolute;
+    left: 50%;
+    bottom: -12px;
+    width: 230px;
+    margin-left: -115px;
+    transform-origin: 50% 100%;
+}
+
+.cam svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.bubble {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    width: max-content;
+    max-width: 360px;
+    transform-origin: 50% 100%;
+    translate: -50% 0;
+    padding: 10px 24px;
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    border: 4px solid var(--brand-ink);
+    border-radius: 24px;
+    font-family: var(--font-family);
+    font-size: 24px;
+    font-weight: 900;
+    white-space: nowrap;
+}
+
+/* Bubble tail */
+.bubble::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    margin-left: -12px;
+    border: 12px solid transparent;
+    border-top-color: var(--brand-ink);
+}
