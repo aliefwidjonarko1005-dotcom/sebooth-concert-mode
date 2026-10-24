@@ -498,19 +498,11 @@ function CaptureSession(): JSX.Element {
         const hasCaptureCard = !!config.selectedCameraId;
         const slot = currentFrame.slots[slotIndex];
 
-        // EDSDK + Capture Card: Use MediaRecorder from capture card stream (uninterrupted)
-        // EDSDK without Capture Card: Use USB live view polling (legacy)
-        // Other modes: Use MediaRecorder from webcam stream
-        if (isEdsdkMode && !hasCaptureCard) {
-            // USB-only EDSDK mode: Use USB live view frame polling
-            console.log('[CaptureSession] Starting USB Live Photo recording (no capture card)...');
-            window.api.camera.startRecordingLivePhoto(slot.id).catch((err: any) => {
-                console.error('[CaptureSession] Failed to start USB Live Photo recording:', err);
-            });
-        } else if (streamRef.current && !mediaRecorderRef.current) {
-            // Capture card stream (EDSDK+HDMI) or standard webcam: Use MediaRecorder
-            // This stream is NOT interrupted when the DSLR shutter fires,
-            // ensuring all slots get complete video recordings.
+        // EDSDK: the camera records the clip itself (movie to SD, clean video). If it can't,
+        // a capture card falls back to MediaRecorder on the HDMI stream.
+        // Other modes: MediaRecorder on the webcam stream.
+        const startMediaRecorder = () => {
+            if (!streamRef.current || mediaRecorderRef.current) return
             try {
                 const recordSource = isEdsdkMode && hasCaptureCard ? 'EDSDK+CaptureCard' : 'Webcam';
                 console.log(`[CaptureSession] Starting MediaRecorder Live Photo (source: ${recordSource})...`);
@@ -555,6 +547,20 @@ function CaptureSession(): JSX.Element {
             } catch (err) {
                 console.error('Failed to start MediaRecorder:', err)
             }
+        }
+
+        if (isEdsdkMode) {
+            console.log('[CaptureSession] Starting camera Live Photo recording...');
+            window.api.camera.startRecordingLivePhoto(slot.id)
+                .then((res: any) => {
+                    if (!(res?.success && res.data) && hasCaptureCard) startMediaRecorder()
+                })
+                .catch((err: any) => {
+                    console.error('[CaptureSession] Failed to start camera Live Photo recording:', err);
+                    if (hasCaptureCard) startMediaRecorder()
+                });
+        } else {
+            startMediaRecorder()
         }
 
         // Initial beep
@@ -715,9 +721,10 @@ function CaptureSession(): JSX.Element {
         const isEdsdkStop = config.cameraMode === 'edsdk';
         const hasCaptureCardStop = !!config.selectedCameraId;
 
-        // EDSDK without capture card: stop USB live view polling recording
-        if (isEdsdkStop && !hasCaptureCardStop) {
-            console.log('[CaptureSession] Stopping USB Live Photo recording (no capture card)...');
+        // EDSDK: stop the camera recording (unless it fell back to MediaRecorder). The returned clip
+        // path is downloaded by main right after this shot, long before the session is saved.
+        if (isEdsdkStop && !mediaRecorderRef.current) {
+            console.log('[CaptureSession] Stopping camera Live Photo recording...');
             window.api.camera.stopRecordingLivePhoto(slot.id)
                 .then((res: any) => {
                     if (res.success && res.data) {

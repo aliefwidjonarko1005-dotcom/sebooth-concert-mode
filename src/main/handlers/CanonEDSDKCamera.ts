@@ -600,6 +600,7 @@ try {
                         if (trimmed.startsWith('SUCCESS:')) {
                             resolved = true
                             cleanup()
+                            this.fetchPendingMovie()
                             resolve({
                                 success: true,
                                 imagePath: outputPath,
@@ -987,18 +988,68 @@ try {
     private recordingTimer: NodeJS.Timeout | null = null
     private recordedFrames: Buffer[] = []
     private recordingSlotId: string | null = null
+    // Live photo recorded by the camera itself (movie to SD): clip path to download after the next shot
+    private movieRecording = false
+    private pendingMovieFetch: string | null = null
+
+    /** Send one helper command and wait for a line starting with `okPrefix` (null on ERROR:/timeout). */
+    private sendAndWait(command: string, okPrefix: string, timeoutMs: number): Promise<string | null> {
+        const helper = this.helperProcess
+        if (!helper) return Promise.resolve(null)
+        return new Promise((resolve) => {
+            let done = false
+            const finish = (v: string | null) => {
+                if (done) return
+                done = true
+                helper.stdout?.removeListener('data', onData)
+                clearTimeout(timer)
+                resolve(v)
+            }
+            const onData = (data: Buffer) => {
+                for (const line of data.toString().split('\n').map(l => l.trim())) {
+                    if (line.startsWith(okPrefix)) return finish(line)
+                    if (line.startsWith('ERROR:')) {
+                        console.warn(`[CanonEDSDK] ${command} -> ${line}`)
+                        return finish(null)
+                    }
+                }
+            }
+            const timer = setTimeout(() => {
+                console.warn(`[CanonEDSDK] ${command} timed out`)
+                finish(null)
+            }, timeoutMs)
+            helper.stdout?.on('data', onData)
+            helper.stdin?.write(`${command}\n`)
+        })
+    }
+
+    /** After a shot: pull the clip recorded during the countdown off the card (background). */
+    private fetchPendingMovie(): void {
+        const target = this.pendingMovieFetch
+        this.pendingMovieFetch = null
+        if (!target) return
+        this.sendAndWait(`REC_FETCH ${target}`, 'REC_SAVED:', 60000).then((line) => {
+            console.log(line ? `[CanonEDSDK] Live photo clip saved: ${target}` : '[CanonEDSDK] Live photo clip download failed')
+        })
+    }
 
     async startRecordingLivePhoto(slotId: string): Promise<boolean> {
         if (!this.helperProcess) return false
-        
-        console.log(`[CanonEDSDK] Starting memory-buffered Live Photo recording for slot: ${slotId}`)
-        
-        // Start helper polling in TFT mode if capture card is active
-        const hasCaptureCard = !!configService.getConfig().selectedCameraId
-        if (hasCaptureCard) {
-            await this.startPolling()
+
+        // Preferred: the camera records a real movie (clean sensor video, no HDMI/screen capture)
+        this.pendingMovieFetch = null
+        const started = await this.sendAndWait('REC_START', 'STATUS:REC_STARTED', 6000)
+        if (started) {
+            console.log(`[CanonEDSDK] Camera movie recording started for slot: ${slotId}`)
+            this.movieRecording = true
+            return true
         }
-        
+
+        // Fallback (no capture card only): USB live view polling. Polling with HDMI active drops the HDMI feed.
+        const hasCaptureCard = !!configService.getConfig().selectedCameraId
+        if (hasCaptureCard) return false
+        console.log(`[CanonEDSDK] Starting memory-buffered Live Photo recording for slot: ${slotId}`)
+
         this.recordedFrames = []
         this.recordingSlotId = slotId
         
@@ -1022,7 +1073,18 @@ try {
 
     async stopRecordingLivePhoto(slotId: string): Promise<string | null> {
         console.log(`[CanonEDSDK] Stopping Live Photo recording for slot: ${slotId}`)
-        
+
+        if (this.movieRecording) {
+            // Fast: stop + locate the clip + back to still mode, so the shutter follows the countdown.
+            // The clip is downloaded right after the next capture; the returned path fills in then.
+            this.movieRecording = false
+            const stopped = await this.sendAndWait('REC_STOP', 'STATUS:REC_STOPPED', 15000)
+            if (!stopped) return null
+            const target = join(app.getPath('userData'), 'temp', `live_${slotId}_${Date.now()}.mp4`)
+            this.pendingMovieFetch = target
+            return target
+        }
+
         if (this.recordingTimer) {
             clearInterval(this.recordingTimer)
             this.recordingTimer = null

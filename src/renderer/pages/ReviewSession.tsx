@@ -6,7 +6,7 @@ import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './ReviewSession.module.css'
 import { useEmitOnChange, emitMascot } from '../lib/mascotEvents'
 import { useElementHeight } from '../lib/useElementHeight'
-import { useButtonHints, useInputMode } from '../components/ButtonRail/ButtonRail'
+import { useButtonHints, useInputMode, useRailStatus } from '../components/ButtonRail/ButtonRail'
 import { useSwipe } from '../lib/useSwipe'
 
 type FilterType = 'none' | 'grayscale' | 'sepia' | 'warm' | 'cool' | 'vintage'
@@ -108,11 +108,13 @@ const ReviewSession: React.FC = () => {
     useEmitOnChange(currentFilterDef.id, () => emitMascot('filter', { name: currentFilterDef.name }))
     useEmitOnChange(isMirrored, () => emitMascot('mirror', { on: isMirrored ? 'on' : 'off' }))
 
+    // Portrait hides the on-screen bar, so the rail carries the filter name and mirror state
     useButtonHints({
         1: { label: 'Filter berikutnya', onScreen: true },
-        2: { label: 'Ganti mirror', onScreen: true },
+        2: { label: `Ganti mirror (${isMirrored ? 'ON' : 'OFF'})`, onScreen: true },
         3: { label: 'Lanjut', primary: true, onScreen: true }
     })
+    useRailStatus(`Filter: ${currentFilterDef.name}`)
 
     // Keyboard navigation according to exact specifications:
     // Key 1: Next filter

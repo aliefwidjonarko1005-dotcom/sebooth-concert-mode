@@ -33,7 +33,7 @@ const getCircularOffset = (index: number, activeIndex: number, length: number): 
     return diff
 }
 
-function OutputPage(): JSX.Element {
+function OutputPage(): JSX.Element | null {
     const navigate = useNavigate()
     const { frames, activeFrame } = useFrameStore()
     const { photos, currentSession, setCompositePath, selectedFilter, isMirrored, endSession } = useSessionStore()
@@ -320,13 +320,12 @@ function OutputPage(): JSX.Element {
                             const cameraRotation = config.cameraRotation || 0
                             const isRotated90or270 = cameraRotation === 90 || cameraRotation === 270
 
-                            // Capture card videos (EDSDK+HDMI) are recorded from the
-                            // MediaRecorder stream which already has correct orientation.
-                            // Only USB live view videos need rotation/mirror CSS correction.
-                            const isCaptureCardSource = isVideo && config.cameraMode === 'edsdk' && !!config.selectedCameraId
+                            // EDSDK clips (camera movie / HDMI fallback) are the raw, unrotated sensor picture:
+                            // turn them upright with rotate(-rot) and mirror only like the photos.
+                            const isCaptureCardSource = isVideo && config.cameraMode === 'edsdk'
 
                             const camRotTransform = isCaptureCardSource
-                                ? '' // Capture card video: already correct orientation
+                                ? `${isMirrored ? 'scaleX(-1) ' : ''}rotate(${-cameraRotation}deg)`
                                 : isVideo && isRotated90or270
                                 ? `rotate(${cameraRotation}deg) scaleX(-1)`
                                 : isVideo && cameraRotation === 180
@@ -335,8 +334,7 @@ function OutputPage(): JSX.Element {
                                 ? `scaleX(-1)`
                                 : ''
 
-                            // For capture card videos, skip dimension swapping from rotation
-                            const effectiveRotated = isCaptureCardSource ? false : isRotated90or270
+                            const effectiveRotated = isRotated90or270
 
                             const mediaStyle: React.CSSProperties = {
                                 position: 'absolute',

@@ -174,6 +174,18 @@ namespace CanonHelper
                 {
                     HandleKeepAlive();
                 }
+                else if (line.Equals("REC_START", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleRecStart();
+                }
+                else if (line.Equals("REC_STOP", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleRecStop();
+                }
+                else if (line.StartsWith("REC_FETCH ", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleRecFetch(line.Substring(10).Trim());
+                }
             }
             catch (Exception ex)
             {
@@ -497,6 +509,126 @@ namespace CanonHelper
             }
         }
 
+        // ── Live photo recorded by the camera itself (movie to SD card, clean sensor video) ──
+        // REC_START: movie mode + record. REC_STOP: stop, locate the clip, back to stills (fast, so the
+        // shutter follows the countdown). REC_FETCH <path>: download + delete the clip after the shot.
+        private static HashSet<string> _recKnownFiles = null;
+        private static NewFile _recPending = null;
+
+        private static uint SetRecord(uint value)
+        {
+            uint v = value;
+            return EdsSetPropertyData_Pin(_cameraRef, kEdsPropID_Record, 0, sizeof(uint), ref v);
+        }
+
+        private static void HandleRecStart()
+        {
+            lock (_cameraLock)
+            {
+                try
+                {
+                    _recPending = null;
+                    _recKnownFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    CollectFiles(_cameraRef, "", _recKnownFiles, null);
+
+                    uint err = EdsSendCommand_Pin(_cameraRef, kEdsCameraCommand_MovieSelectSwON, 0);
+                    if (err != 0) Console.WriteLine("WARNING:MovieSelectSwON err=0x" + err.ToString("X"));
+
+                    // The body needs a moment to switch to movie mode; Device Busy until then
+                    for (int i = 0; i < 25; i++)
+                    {
+                        EdsGetEvent_Pin();
+                        Thread.Sleep(120);
+                        err = SetRecord(4);
+                        if (err == 0)
+                        {
+                            Console.WriteLine("STATUS:REC_STARTED");
+                            return;
+                        }
+                    }
+                    Console.WriteLine("ERROR:REC_START failed (0x" + err.ToString("X") + ")");
+                    EdsSendCommand_Pin(_cameraRef, kEdsCameraCommand_MovieSelectSwOFF, 0);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("ERROR:REC_START exception - " + ex.Message);
+                }
+            }
+        }
+
+        private static void HandleRecStop()
+        {
+            lock (_cameraLock)
+            {
+                try
+                {
+                    uint err = SetRecord(0);
+                    if (err != 0) Console.WriteLine("WARNING:Record stop err=0x" + err.ToString("X"));
+
+                    // Wait for the clip to be finalised on the card
+                    for (int attempt = 0; attempt < 60 && _recPending == null; attempt++)
+                    {
+                        EdsGetEvent_Pin();
+                        Thread.Sleep(150);
+                        var files = new List<NewFile>();
+                        CollectFiles(_cameraRef, "", null, files);
+                        foreach (var f in files)
+                        {
+                            if (_recKnownFiles != null && _recKnownFiles.Contains(f.Key)) continue;
+                            if (f.Name.EndsWith(".MP4", StringComparison.OrdinalIgnoreCase) || f.Name.EndsWith(".MOV", StringComparison.OrdinalIgnoreCase))
+                            {
+                                _recPending = f;
+                                break;
+                            }
+                        }
+                    }
+
+                    err = EdsSendCommand_Pin(_cameraRef, kEdsCameraCommand_MovieSelectSwOFF, 0);
+                    if (err != 0) Console.WriteLine("WARNING:MovieSelectSwOFF err=0x" + err.ToString("X"));
+                    Thread.Sleep(400);
+                    EdsGetEvent_Pin();
+
+                    if (_recPending != null) Console.WriteLine("STATUS:REC_STOPPED:" + _recPending.Name);
+                    else Console.WriteLine("ERROR:REC_STOP no clip found on card");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("ERROR:REC_STOP exception - " + ex.Message);
+                }
+            }
+        }
+
+        private static void HandleRecFetch(string outputPath)
+        {
+            lock (_cameraLock)
+            {
+                var clip = _recPending;
+                _recPending = null;
+                if (clip == null)
+                {
+                    Console.WriteLine("ERROR:REC_FETCH no pending clip");
+                    return;
+                }
+                try
+                {
+                    uint err = DownloadFile(clip.Ref, clip.Size, outputPath);
+                    if (err == 0)
+                    {
+                        EdsDeleteDirectoryItem(clip.Ref);
+                        Console.WriteLine("REC_SAVED:" + outputPath);
+                    }
+                    else
+                    {
+                        Console.WriteLine("ERROR:REC_FETCH download failed (0x" + err.ToString("X") + ")");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("ERROR:REC_FETCH exception - " + ex.Message);
+                }
+            }
+        }
+
         private static IntPtr FindNewestFile(IntPtr cameraRef, ref string newestName, ref ulong newestSize)
         {
             IntPtr newestRef = IntPtr.Zero;
@@ -694,6 +826,12 @@ namespace CanonHelper
         private static extern uint EdsGetEvent_Pin();
 
         private const uint kEdsCameraCommand_ExtendShutDownTimer = 0x00000001;
+        private const uint kEdsCameraCommand_MovieSelectSwON = 0x00000107;
+        private const uint kEdsCameraCommand_MovieSelectSwOFF = 0x00000108;
+        private const uint kEdsPropID_Record = 0x00000510;
+
+        [System.Runtime.InteropServices.DllImport("EDSDK.dll", EntryPoint = "EdsSetPropertyData")]
+        private static extern uint EdsSetPropertyData_Pin(IntPtr inRef, uint inPropertyID, int inParam, int inPropertySize, ref uint inPropertyData);
 
         [System.Runtime.InteropServices.DllImport("EDSDK.dll", EntryPoint = "EdsSendCommand")]
         private static extern uint EdsSendCommand_Pin(IntPtr inCameraRef, uint inCommand, int inParam);

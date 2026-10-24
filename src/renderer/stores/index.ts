@@ -214,7 +214,7 @@ interface FrameState {
     updateFrame: (id: string, updates: Partial<FrameConfig>) => void
     deleteFrame: (id: string) => void
     setActiveFrame: (id: string | null) => void
-    addSlot: (frameId: string, slot?: Partial<PhotoSlot>) => void
+    addSlot: (frameId: string, slot?: Partial<PhotoSlot>) => string // returns the new slot id
     updateSlot: (frameId: string, slotId: string, updates: Partial<PhotoSlot>) => void
     deleteSlot: (frameId: string, slotId: string) => void
     addQRSlot: (frameId: string, slot?: Partial<QRSlot>) => void
@@ -296,6 +296,7 @@ export const useFrameStore = create<FrameState>()(
                                 : f
                         )
                     }))
+                    return newSlot.id
                 },
 
                 updateSlot: (frameId, slotId, updates) => set((state) => ({

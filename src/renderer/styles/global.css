@@ -160,7 +160,7 @@ body {
 /* Rail visible: pages render in the stage left of it */
 body.has-rail { --rail-w: 260px; }
 /* Portrait screens are only 1080px wide: slimmer rail so the stage keeps ~840px */
-body.app-portrait.has-rail { --rail-w: 236px; }
+body.app-portrait.has-rail { --rail-w: 165px; } /* 70% of the old 236px */
 
 /* Typography */
 h1, h2, h3, h4, h5, h6 {

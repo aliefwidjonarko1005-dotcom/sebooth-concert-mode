@@ -21,7 +21,7 @@ export interface SaveSessionParams {
     overlay?: { path: string; filename: string }
     mirrorOutput?: boolean
     cameraRotation?: 0 | 90 | 180 | 270
-    videoSource?: 'capture_card' | 'usb_liveview' | 'webcam'
+    videoSource?: 'camera' | 'capture_card' | 'usb_liveview' | 'webcam' // camera = raw EDSDK clip (movie/HDMI/EVF)
     frameConfig?: {
         width: number
         height: number
@@ -33,6 +33,16 @@ export interface SaveSessionParams {
 /**
  * Register all system-related IPC handlers
  */
+// ffmpeg filter that turns the camera's raw video into the upright picture.
+// Capture card (raw HDMI) needs rotate(-rot), USB live view / webcam keep the old rotate(rot).
+function cameraRotationFilter(rotation: number, captureCard: boolean): string {
+    const rot = captureCard ? (360 - rotation) % 360 : rotation
+    if (rot === 90) return 'transpose=1' // 90 deg CW
+    if (rot === 270) return 'transpose=2' // 90 deg CCW
+    if (rot === 180) return 'hflip,vflip'
+    return ''
+}
+
 export function registerSystemHandlers(ipcMain: IpcMain): void {
 
     // Open file dialog
@@ -302,7 +312,7 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                         const destPath = join(baseDir, photo.filename)
                         if (params.mirrorOutput) {
                             try {
-                                buffer = Buffer.from(await sharp(buffer).flop().toBuffer())
+                                buffer = Buffer.from(await sharp(buffer).rotate().flop().toBuffer()) // rotate() = apply EXIF orientation before the EXIF is dropped
                             } catch (sharpErr) {
                                 console.error('Failed to mirror webcam photo base64:', sharpErr)
                             }
@@ -317,7 +327,7 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                         const destPath = join(baseDir, photo.filename)
                         if (params.mirrorOutput) {
                             try {
-                                await sharp(cleanUrl).flop().toFile(destPath)
+                                await sharp(cleanUrl).rotate().flop().toFile(destPath)
                             } catch (sharpErr) {
                                 console.error('Failed to mirror local photo with sharp:', sharpErr)
                                 copyFileSync(cleanUrl, destPath)
@@ -430,22 +440,12 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                             // Construct complex filter graph
                             let filterGraph = ''
 
-                            // Determine if we should apply camera rotation/mirror transforms.
-                            // Capture card videos already have correct orientation (recorded from
-                            // the HDMI stream which matches what the user sees on screen),
-                            // so we SKIP cameraRotation and hflip to avoid double-transform.
-                            const isCaptureCardVideo = params.videoSource === 'capture_card'
-                            const camRot = isCaptureCardVideo ? 0 : (params.cameraRotation || 0)
-                            const shouldMirror = isCaptureCardVideo ? false : !!params.mirrorOutput
-
-                            let camRotFilter = ''
-                            if (camRot === 90) {
-                                camRotFilter = 'transpose=1' // 90 deg CW
-                            } else if (camRot === 270) {
-                                camRotFilter = 'transpose=2' // 90 deg CCW
-                            } else if (camRot === 180) {
-                                camRotFilter = 'hflip,vflip' // 180 deg
-                            }
+                            // Capture card videos are the raw HDMI stream (e.g. 1920x1080, unrotated).
+                            // The preview shows it as CSS rotate(rot) scaleX(-1), so the unmirrored
+                            // picture is the raw stream rotated by -rot; mirror only like the photos.
+                            const isCaptureCardVideo = params.videoSource === 'camera' || params.videoSource === 'capture_card'
+                            const camRotFilter = cameraRotationFilter(params.cameraRotation || 0, isCaptureCardVideo)
+                            const shouldMirror = !!params.mirrorOutput
 
                             validInputs.forEach((input, i) => {
                                 const w = Math.round(input.slot.width)
@@ -540,7 +540,8 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                             }
 
                             command
-                                .complexFilter(filterGraph, finalNode)
+                                // The graph always ends in [out]; with QR slots 'bg_with_frame' is an intermediate label
+                                .complexFilter(filterGraph, 'out')
                                 .outputOptions('-c:v libx264')
                                 .outputOptions('-preset veryfast')
                                 .outputOptions('-crf 28')
@@ -576,20 +577,12 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                         const mp4Filename = video.filename.replace(/\.webm$/, '.mp4')
                         const destPath = join(baseDir, mp4Filename)
 
-                        const isCaptureCardLegacy = params.videoSource === 'capture_card'
-                        const camRot = isCaptureCardLegacy ? 0 : (params.cameraRotation || 0)
-                        let camRotFilter = ''
-                        if (camRot === 90) {
-                            camRotFilter = 'transpose=1'
-                        } else if (camRot === 270) {
-                            camRotFilter = 'transpose=2'
-                        } else if (camRot === 180) {
-                            camRotFilter = 'hflip,vflip'
-                        }
+                        const isCaptureCardLegacy = params.videoSource === 'camera' || params.videoSource === 'capture_card'
+                        const camRotFilter = cameraRotationFilter(params.cameraRotation || 0, isCaptureCardLegacy)
 
                         let videoFilter = ''
                         if (camRotFilter) videoFilter = camRotFilter
-                        if (!isCaptureCardLegacy && params.mirrorOutput) {
+                        if (params.mirrorOutput) {
                             videoFilter += videoFilter ? ',hflip' : 'hflip'
                         }
 

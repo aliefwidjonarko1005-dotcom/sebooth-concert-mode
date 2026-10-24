@@ -497,6 +497,19 @@
     flex-direction: column !important;
 }
 
+/* PORTRAIT (button booth) ONLY: the preview is width-bound, so slim the sticker frame
+   and its room to give the camera feed nearly the whole stage width (rail stays clear) */
+:global(body.app-portrait) .viewfinderSlot {
+    padding: 8px 16px 18px 8px;
+}
+
+:global(body.app-portrait) .viewfinder {
+    box-shadow:
+        0 0 0 4px #FFFFFF,
+        0 0 0 8px var(--brand-ink),
+        7px 8px 0 8px var(--brand-orange);
+}
+
 :global(body.app-portrait) .reviewPopup {
     width: 95% !important;
     max-width: 100% !important;

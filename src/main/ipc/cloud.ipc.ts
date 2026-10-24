@@ -51,7 +51,7 @@ async function drainQueue(): Promise<void> {
         }
         // shortcut: an error with a Postgres code means the server answered (bad row), so drop it instead of blocking the queue forever
         if (error.code) {
-          console.error(`[Cloud Queue] Dropping DB row for ${item.table}:`, error.message);
+          console.error(`[Cloud Queue] Dropping DB row for ${item.table} (${error.code}):`, error.message);
           uploadQueue.markSuccessful(item.id);
           continue;
         }
@@ -96,10 +96,10 @@ export function enqueueSessionUpload(params: {
   files: { path: string; destName: string; mimeType: string; type: 'photo' | 'gif' | 'live'; isStrip?: boolean }[];
 }): void {
   const { sessionId } = params;
+  // Only columns that exist in Supabase `sessions` (an unknown column makes PostgREST reject the whole row)
   uploadQueue.enqueueRow('sessions', {
     id: sessionId,
     event_name: params.eventName,
-    frame_name: params.frameName,
     is_claimed: false,
     created_at: new Date().toISOString()
   }, 'id');

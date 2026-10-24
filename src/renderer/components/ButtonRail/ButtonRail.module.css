@@ -38,8 +38,24 @@
     align-items: center;
     justify-content: flex-end;
     gap: 14px;
-    padding-right: 24px;
+    padding: 6px 24px 6px 0;
     transition: opacity var(--transition-base);
+    /* it's a <button> (clickable legend): drop the native look */
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.item:disabled {
+    cursor: default;
+}
+
+.item:active:not(:disabled) .badge {
+    transform: scale(0.92);
 }
 
 .label {
@@ -100,15 +116,41 @@
     opacity: 0.18;
 }
 
-/* Portrait: same right-edge rail, tighter type so it fits 236px */
+/* PORTRAIT (button booth) ONLY: same right-edge rail at 70% size (165px) */
+:global(body.app-portrait) .logo {
+    top: 13px;
+    left: 17px;
+    right: 17px;
+}
+
+:global(body.app-portrait) .status {
+    margin-top: 7px;
+    font-size: 14px;
+}
+
+:global(body.app-portrait) .item {
+    gap: 10px;
+    padding-right: 17px;
+}
+
 :global(body.app-portrait) .label {
-    font-size: 19px;
+    font-size: 14px;
+    padding-left: 6px;
+    overflow-wrap: break-word; /* wrap between words, not mid-word ("sebelumny/a") */
 }
 
 :global(body.app-portrait) .badge {
-    width: 68px;
-    height: 68px;
-    font-size: 36px;
+    width: 48px;
+    height: 48px;
+    font-size: 25px;
+    border-width: 3px;
+}
+
+:global(body.app-portrait) .badge::after {
+    right: -13px;
+    border-left-width: 8px;
+    border-top-width: 7px;
+    border-bottom-width: 7px;
 }
 
 /* ── Touch mode (landscape): bottom dock of tappable actions instead of the rail ── */

@@ -7,6 +7,7 @@ import { PrintQuantityModal } from '../components/PrintQuantityModal'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './SharingPage.module.css'
 import { useButtonHints } from '../components/ButtonRail/ButtonRail'
+import { getQRUrl } from '../lib/composite'
 
 function SharingPage(): JSX.Element {
     const navigate = useNavigate()
@@ -33,20 +34,10 @@ function SharingPage(): JSX.Element {
         setIsGenerating(true)
         setError(null)
         try {
-            // Priority 1: Check if we have a cloud session ID first (Cloud Mode)
-            if (config.sharingMode === 'cloud' && currentSession?.cloudSessionId) {
-                let portalBase = config.cloudPortalUrl
-                console.log('Generating QR for cloud session:', currentSession.cloudSessionId, 'with portal:', portalBase)
-                
-                if (!portalBase) {
-                    const ipRes = await (window as any).api.system.getLocalIp()
-                    const localIp = (ipRes && ipRes.success && ipRes.data) ? ipRes.data : 'localhost'
-                    portalBase = `http://${localIp}:3000`
-                }
-                
-                portalBase = portalBase.replace(/\/$/, '')
-                const portalUrl = `${portalBase}/access/${currentSession.cloudSessionId}`
-                
+            // Priority 1: Cloud Mode. The background upload keys the portal by the local session id,
+            // so use the same URL as the QR printed on the strip (cloudSessionId is no longer set).
+            if (config.sharingMode === 'cloud' && currentSession) {
+                const portalUrl = await getQRUrl(config, currentSession.cloudSessionId || currentSession.id)
                 setQrUrl(portalUrl)
                 localStorage.setItem(`gallery_${currentSession.id}`, portalUrl)
                 setIsGenerating(false)
@@ -87,7 +78,9 @@ function SharingPage(): JSX.Element {
     }
 
     const handlePrint = () => {
-        const paidQuantity = currentSession?.printQuantity
+        // startSession defaults printQuantity to 2, so only treat it as "already paid" when payment is on;
+        // otherwise always let the customer pick how many (multiples of 2, one sheet = 2 strips).
+        const paidQuantity = config.paymentEnabled ? currentSession?.printQuantity : undefined
         if (paidQuantity && paidQuantity > 0) {
             console.log('[SharingPage] Paid quantity found from Payment Gateway:', paidQuantity)
             console.log('[SharingPage] Navigating to /printing directly with printQuantity:', paidQuantity)
