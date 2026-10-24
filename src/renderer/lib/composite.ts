@@ -59,6 +59,8 @@ export const getQRUrl = async (config: AppConfig, sessionId: string): Promise<st
             portalBase = `http://${localIp}:3000`
         }
         portalBase = portalBase.replace(/\/$/, '')
+        // "sebooth.in" without a scheme makes the QR plain text on many phone scanners
+        if (!/^https?:\/\//i.test(portalBase)) portalBase = `https://${portalBase}`
         return `${portalBase}/access/${sessionId}`
     }
     const ipRes = await (window as any).api.system.getLocalIp()
@@ -250,11 +252,8 @@ export const buildSaveParams = async (params: {
         overlay: { path: frame.overlayPath, filename: 'overlay.png' },
         mirrorOutput: params.mirror,
         cameraRotation: config.cameraRotation || 0,
-        // Capture card videos (EDSDK+HDMI) already have correct orientation from MediaRecorder;
-        // USB live view videos need rotation/mirror transforms applied.
-        videoSource: (config.cameraMode === 'edsdk' && config.selectedCameraId)
-            ? 'capture_card' as const
-            : (config.cameraMode === 'edsdk' ? 'usb_liveview' as const : 'webcam' as const),
+        // EDSDK clips (camera movie, or the HDMI/EVF fallback) are the raw, unrotated sensor picture
+        videoSource: config.cameraMode === 'edsdk' ? 'camera' as const : 'webcam' as const,
         frameConfig: {
             width: frame.canvasWidth,
             height: frame.canvasHeight,

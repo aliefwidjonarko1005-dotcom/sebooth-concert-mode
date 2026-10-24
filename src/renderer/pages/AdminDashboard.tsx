@@ -738,6 +738,23 @@ function AdminDashboard(): JSX.Element {
         }
     }
 
+    // Duplicate a slot: same size/rotation, nudged so it doesn't sit exactly on top.
+    // samePhoto links it to the source shot (duplicateOfSlotId), otherwise it takes its own photo.
+    const handleDuplicateSlot = (slotId: string, samePhoto: boolean): void => {
+        if (!selectedFrame) return
+        const src = selectedFrame.slots.find(s => s.id === slotId)
+        if (!src) return
+        const newId = addSlot(selectedFrame.id, {
+            x: src.x + 30,
+            y: src.y + 30,
+            width: src.width,
+            height: src.height,
+            rotation: src.rotation,
+            duplicateOfSlotId: samePhoto ? (src.duplicateOfSlotId || src.id) : undefined
+        })
+        setSelectedSlotId(newId)
+    }
+
     // Delete selected slot
     const handleDeleteSelectedSlot = (): void => {
         if (selectedFrame && selectedSlotId) {
@@ -948,6 +965,16 @@ function AdminDashboard(): JSX.Element {
                                         <button className={styles.addSlotButton} onClick={handleAddSlot}>
                                             + Add Photo Slot
                                         </button>
+                                        {selectedSlotId && selectedFrame.slots.some(s => s.id === selectedSlotId) && (
+                                            <button
+                                                className={styles.addSlotButton}
+                                                onClick={() => handleDuplicateSlot(selectedSlotId, true)}
+                                                title="Copy the selected slot (same photo)"
+                                                style={{ marginLeft: '10px' }}
+                                            >
+                                                Duplicate Slot
+                                            </button>
+                                        )}
                                         <button
                                             className={styles.primaryButton}
                                             onClick={handleSetActive}
@@ -1330,6 +1357,26 @@ function AdminDashboard(): JSX.Element {
                                                                 }
                                                             </select>
                                                         </label>
+                                                    </div>
+                                                    <div className={styles.duplicateSlotRow}>
+                                                        <button
+                                                            className={styles.duplicateSlotBtn}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleDuplicateSlot(slot.id, true)
+                                                            }}
+                                                        >
+                                                            Duplicate (same photo)
+                                                        </button>
+                                                        <button
+                                                            className={styles.duplicateSlotBtn}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                handleDuplicateSlot(slot.id, false)
+                                                            }}
+                                                        >
+                                                            Duplicate (new photo)
+                                                        </button>
                                                     </div>
                                                     <button
                                                         className={styles.deleteSlotBtn}

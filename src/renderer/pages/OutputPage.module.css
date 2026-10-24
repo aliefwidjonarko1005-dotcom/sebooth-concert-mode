@@ -289,9 +289,11 @@
     height: 100vh !important;
 }
 
-:global(body.app-portrait) .bottomActionBar {
-    padding: 8px 16px !important;
-    gap: var(--spacing-md) !important;
+/* PORTRAIT (button booth) ONLY: the rail already guides buttons 1/2/3 and nothing here is tappable,
+   so the on-screen action bar and the "Kembali" chip are dropped */
+:global(body.app-portrait) .bottomActionBar,
+:global(body.app-portrait) .backButton {
+    display: none !important;
 }
 
 :global(body.app-portrait) .actionBtn {

@@ -166,14 +166,19 @@ export function ButtonRail(): JSX.Element | null {
                     {([1, 2, 3] as ButtonKey[]).map((k, i) => {
                         const hint = hints[k]
                         return (
-                            <div
+                            <button
                                 key={k}
+                                type="button"
+                                tabIndex={-1}
+                                disabled={!hint}
                                 className={`${styles.item} ${hint ? '' : styles.idle} ${hint?.primary ? styles.primary : ''}`}
                                 style={{ top: `${positions[i]}%` }}
+                                // Clicking/tapping the legend = pressing that physical button (same keydown path)
+                                onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: String(k), bubbles: true }))}
                             >
                                 <span className={styles.label}>{hint?.label || ''}</span>
                                 <span className={styles.badge}>{k}</span>
-                            </div>
+                            </button>
                         )
                     })}
                 </aside>

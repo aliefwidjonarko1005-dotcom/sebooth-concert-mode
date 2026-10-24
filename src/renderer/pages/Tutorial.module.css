@@ -216,32 +216,65 @@ button.cta:active {
     }
 }
 
-/* ── Portrait (push-button booth): stack intro above a taller strip ── */
+/* ── PORTRAIT (button booth) ONLY: stack intro above a taller strip.
+   Sizes follow the screen height (max = the 1080×1920 booth) so nothing is cut on shorter screens. ── */
 :global(body.app-portrait) .container {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
     align-items: start;
     justify-items: center;
-    gap: 40px;
-    padding: calc(var(--top-chip-top) + var(--top-chip-h) + 32px) 40px 48px;
+    gap: clamp(20px, 2.1vh, 40px);
+    padding: calc(var(--top-chip-top) + var(--top-chip-h) + clamp(16px, 1.7vh, 32px)) 40px clamp(24px, 2.5vh, 48px);
+}
+
+:global(body.app-portrait) .intro {
+    gap: clamp(14px, 1.5vh, 28px);
 }
 
 :global(body.app-portrait) .title {
-    font-size: 92px;
+    font-size: clamp(56px, 4.8vh, 92px);
+}
+
+:global(body.app-portrait) .lead {
+    font-size: clamp(20px, 1.35vh, 26px);
+}
+
+:global(body.app-portrait) .controlsPic {
+    width: clamp(80px, 6.7vh, 128px);
+}
+
+:global(body.app-portrait) .controlsList {
+    font-size: clamp(18px, 1.15vh, 22px);
+}
+
+:global(body.app-portrait) .cta {
+    font-size: clamp(22px, 1.45vh, 28px);
+    padding: clamp(8px, 0.6vh, 12px) 34px;
+}
+
+:global(body.app-portrait) .ctaKey {
+    width: clamp(42px, 2.8vh, 54px);
+    height: clamp(42px, 2.8vh, 54px);
 }
 
 :global(body.app-portrait) .strip {
     width: min(100%, 600px);
     align-self: center;
+    gap: clamp(8px, 0.75vh, 14px);
+    padding: clamp(10px, 0.95vh, 18px) clamp(10px, 0.95vh, 18px) clamp(24px, 2.9vh, 56px);
+}
+
+:global(body.app-portrait) .frame {
+    padding: clamp(8px, 0.75vh, 14px);
 }
 
 :global(body.app-portrait) .pic {
-    width: 132px;
-    height: 132px;
+    width: clamp(64px, 6.9vh, 132px);
+    height: clamp(64px, 6.9vh, 132px);
 }
 
 :global(body.app-portrait) .stepText {
-    font-size: 26px;
+    font-size: clamp(18px, 1.35vh, 26px);
 }
 
 /* ══ LANDSCAPE (touch booth) ONLY ══ Portrait must never be affected by rules below. */

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useButtonHintsOverride } from '../ButtonRail/ButtonRail'
 import styles from './PrintQuantityModal.module.css'
 
 interface PrintQuantityModalProps {
@@ -12,28 +13,38 @@ interface PrintQuantityModalProps {
 export function PrintQuantityModal({ isOpen, onClose, onConfirm, initialQuantity = 2 }: PrintQuantityModalProps): JSX.Element | null {
     const [quantity, setQuantity] = useState(initialQuantity)
 
-    // Keyboard navigation when modal is open
+    // Physical buttons: 1 = fewer (cancel at the minimum), 2 = more, 3 = print (3 is always forward).
+    // The rail shows the same labels while open; handled in capture phase so the page underneath stays put.
+    const stateRef = useRef({ quantity, onClose, onConfirm })
+    stateRef.current = { quantity, onClose, onConfirm }
+
+    useButtonHintsOverride(isOpen ? {
+        1: { label: quantity <= 2 ? 'Batal' : 'Kurangi' },
+        2: { label: 'Tambah cetak' },
+        3: { label: `Cetak ${quantity} foto`, primary: true }
+    } : null)
+
     useEffect(() => {
         if (!isOpen) return
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-
+            if (e.key !== '1' && e.key !== '2' && e.key !== '3') return
+            e.preventDefault()
+            e.stopImmediatePropagation()
+            const { quantity: q, onClose: close, onConfirm: confirm } = stateRef.current
             if (e.key === '1') {
-                e.preventDefault()
-                setQuantity(prev => Math.max(2, prev - 2))
-            } else if (e.key === '3') {
-                e.preventDefault()
-                setQuantity(prev => prev + 2)
+                if (q <= 2) close()
+                else setQuantity(q - 2)
             } else if (e.key === '2') {
-                e.preventDefault()
-                onConfirm(quantity)
-                onClose()
+                setQuantity(q + 2)
+            } else {
+                confirm(q)
+                close()
             }
         }
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [isOpen, quantity, onConfirm, onClose])
+        window.addEventListener('keydown', handleKeyDown, true)
+        return () => window.removeEventListener('keydown', handleKeyDown, true)
+    }, [isOpen])
 
     if (!isOpen) return null
 
@@ -74,7 +85,7 @@ export function PrintQuantityModal({ isOpen, onClose, onConfirm, initialQuantity
 
                     <h2 className={styles.title}>Mau cetak berapa foto?</h2>
                     <p className={styles.subtitle}>
-                        Kita pakai kelipatan 2 yaa
+                        Kelipatan 2: satu lembar cetak berisi 2 photostrip
                     </p>
 
                     <div className={styles.quantitySelector}>
@@ -93,6 +104,7 @@ export function PrintQuantityModal({ isOpen, onClose, onConfirm, initialQuantity
                             +
                         </button>
                     </div>
+                    <p className={styles.sheets}>{quantity / 2} lembar cetak</p>
 
                     <div className={styles.actions}>
                         <button

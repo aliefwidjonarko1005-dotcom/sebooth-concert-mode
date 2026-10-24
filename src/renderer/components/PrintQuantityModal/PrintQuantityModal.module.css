@@ -103,6 +103,15 @@
     text-align: center;
 }
 
+/* "N lembar" under the count: one printed sheet = 2 strips */
+.sheets {
+    margin: -12px 0 0;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--brand-ink);
+}
+
 .actions {
     display: flex;
     gap: 12px;
