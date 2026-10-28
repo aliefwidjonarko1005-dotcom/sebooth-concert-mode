@@ -49,6 +49,12 @@ const useHintStore = create<{
 }))
 
 /** Declare the physical button actions for the current screen. Pass a stable-ish object; it's compared by content. */
+// A click/tap = a short press of the physical button (keydown then keyup, so hold timers see a release)
+function pressKey(k: ButtonKey): void {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: String(k), bubbles: true }))
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: String(k), bubbles: true }))
+}
+
 export function useButtonHints(hints: Hints): void {
     const set = useHintStore((s) => s.set)
     const key = JSON.stringify(hints)
@@ -150,7 +156,7 @@ export function ButtonRail(): JSX.Element | null {
                             type="button"
                             className={`${styles.dockBtn} ${hints[k]!.primary ? styles.dockPrimary : ''}`}
                             // Same path as the physical button: pages listen for keydown 1/2/3
-                            onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: String(k), bubbles: true }))}
+                            onClick={() => pressKey(k)}
                         >
                             {hints[k]!.label}
                         </button>
@@ -174,7 +180,7 @@ export function ButtonRail(): JSX.Element | null {
                                 className={`${styles.item} ${hint ? '' : styles.idle} ${hint?.primary ? styles.primary : ''}`}
                                 style={{ top: `${positions[i]}%` }}
                                 // Clicking/tapping the legend = pressing that physical button (same keydown path)
-                                onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: String(k), bubbles: true }))}
+                                onClick={() => pressKey(k)}
                             >
                                 <span className={styles.label}>{hint?.label || ''}</span>
                                 <span className={styles.badge}>{k}</span>

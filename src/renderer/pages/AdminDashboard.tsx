@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useFrameStore, useAppConfig, useFilterStore, useSessionStore } from '../stores'
+import { DEFAULT_VIEW_ZOOM, WIDE_VIEW_ZOOM, isWideView } from '@shared/viewZoom'
 import { AppConfig, FrameConfig, PhotoSlot, PrinterDevice } from '@shared/types'
 import { v4 as uuidv4 } from 'uuid'
 import { apiHelper } from '../lib/apiHelper'
@@ -1513,6 +1514,13 @@ function AdminDashboard(): JSX.Element {
                                                     </label>
                                                     <span className={styles.toggleLabel}>{art.enabled ? 'Animasi aktif' : 'Animasi mati'}</span>
                                                 </div>
+                                                <div className={styles.timerToggle}>
+                                                    <label className={styles.toggleSwitch}>
+                                                        <input type="checkbox" checked={config.homeLiveCamEnabled !== false} onChange={(e) => updateConfig({ homeLiveCamEnabled: e.target.checked })} />
+                                                        <span className={styles.toggleSlider}></span>
+                                                    </label>
+                                                    <span className={styles.toggleLabel}>{config.homeLiveCamEnabled !== false ? 'Live kamera di beranda: nyala' : 'Live kamera di beranda: mati'}</span>
+                                                </div>
                                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                                     {([['aurora', 'Aurora'], ['shapes', 'Geometri'], ['waves', 'Gelombang']] as const).map(([id, name]) => (
                                                         <button key={id} type="button" style={pill(art.style === id)} onClick={() => setArt({ style: id })}>{name}</button>
@@ -2956,6 +2964,37 @@ function AdminDashboard(): JSX.Element {
                                         >
                                             Reset
                                         </button>
+                                    </div>
+                                </div>
+
+                                {/* Digital zoom: centre crop applied to preview, photo and live video */}
+                                <div style={{ marginTop: '20px', paddingTop: '15px', borderTop: '1px solid var(--color-border)' }}>
+                                    <label style={{ fontSize: '14px', fontWeight: 'bold', color: 'white' }}>Tampilan Kamera</label>
+                                    <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '5px 0 10px 0' }}>
+                                        Default view memotong bagian tengah ({Math.round(DEFAULT_VIEW_ZOOM * 100)}%), wide view memakai gambar penuh (100%). Berlaku untuk preview, foto, dan live video; pelanggan bisa menggantinya dengan tombol 2 di beranda dan saat foto.
+                                    </p>
+                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                        {[
+                                            { label: `Default view (${Math.round(DEFAULT_VIEW_ZOOM * 100)}%)`, zoom: DEFAULT_VIEW_ZOOM, active: !isWideView(config.digitalZoom) },
+                                            { label: 'Wide view (100%)', zoom: WIDE_VIEW_ZOOM, active: isWideView(config.digitalZoom) }
+                                        ].map(opt => (
+                                            <button
+                                                key={opt.label}
+                                                onClick={() => updateConfig({ digitalZoom: opt.zoom })}
+                                                style={{
+                                                    padding: '8px 15px',
+                                                    fontSize: '13px',
+                                                    borderRadius: '6px',
+                                                    border: `1px solid ${opt.active ? '#fe6b00' : 'var(--color-border)'}`,
+                                                    background: opt.active ? '#fe6b00' : 'var(--color-bg-secondary)',
+                                                    color: 'white',
+                                                    cursor: 'pointer',
+                                                    fontWeight: 'bold'
+                                                }}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
                                     </div>
                                 </div>
                             </div>

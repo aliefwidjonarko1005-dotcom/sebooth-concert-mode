@@ -7,6 +7,33 @@ import { DigiCamHTTPCamera } from '../handlers/DigiCamHTTPCamera'
 import { CanonEDSDKCamera } from '../handlers/CanonEDSDKCamera'
 import { MockCamera } from '../handlers/MockCamera'
 import { CameraDevice, CaptureResult, CameraPropertyValues, APIResponse } from '@shared/types'
+import sharp from 'sharp'
+import { rename } from 'fs/promises'
+import { configService } from '../services/ConfigService'
+
+/**
+ * Digital zoom = centre crop at the photo's own aspect (no upscaling). The crop is symmetric,
+ * so it is the same before/after EXIF orientation; withMetadata keeps that orientation.
+ */
+async function applyDigitalZoom(imagePath: string): Promise<void> {
+    const zoom = Number(configService.getConfig().digitalZoom) || 1
+    if (zoom <= 1.001) return
+    try {
+        const meta = await sharp(imagePath).metadata()
+        if (!meta.width || !meta.height) return
+        const width = Math.round(meta.width / zoom)
+        const height = Math.round(meta.height / zoom)
+        const tmp = `${imagePath}.zoom.jpg`
+        await sharp(imagePath)
+            .extract({ left: Math.floor((meta.width - width) / 2), top: Math.floor((meta.height - height) / 2), width, height })
+            .withMetadata()
+            .jpeg({ quality: 95 })
+            .toFile(tmp)
+        await rename(tmp, imagePath)
+    } catch (e) {
+        console.warn('[Camera IPC] Digital zoom crop failed, keeping the full frame:', (e as Error).message)
+    }
+}
 
 // Use GPhoto (Lightweight) in production, Mock in development
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
@@ -87,6 +114,10 @@ export function registerCameraHandlers(ipcMain: IpcMain): void {
             const result = await (cameraHandler as any).capture(outputPath, options)
             const elapsedMs = Date.now() - captureStartTime
             console.log(`[Camera IPC] 🟢 CAPTURE COMPLETED in ${elapsedMs}ms:`, { success: result.success, imagePath: result.imagePath, error: result.error })
+
+            if (result.success && result.imagePath) {
+                await applyDigitalZoom(result.imagePath)
+            }
 
             if (!result.success && cameraHandler.constructor.name === 'GPhotoCamera' && result.error?.includes('not found')) {
                 console.warn('[Camera IPC] GPhoto fallback could not capture; returning actionable error')

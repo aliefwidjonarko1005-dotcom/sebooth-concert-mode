@@ -240,7 +240,9 @@ export interface AppConfig {
     buttonRailPositions?: [number, number, number] // vertical centre of each button, % of screen height
 
     // Camera Preview Adjustments
-    cameraZoom?: number // DSLR Live View zoom level (1.0 to 2.0)
+    cameraZoom?: number // DSLR Live View zoom level (1.0 to 2.0) — preview calibration only
+    digitalZoom?: number // Centre crop at the same aspect for preview, photo and live video: default view 1.6, wide view 1.0 (shared/viewZoom.ts)
+    homeLiveCamEnabled?: boolean // Landing shows the framed live preview (default on)
     cameraScaleX?: number // Custom horizontal scale
     cameraScaleY?: number // Custom vertical scale
     cameraOffsetX?: number // Custom X offset in px

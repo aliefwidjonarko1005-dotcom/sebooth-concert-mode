@@ -40,12 +40,18 @@ export function GuideTransition({ enabled, pace = 2.3, holdKeys = false }: { ena
         const to = location.pathname
         prevPath.current = to
         if (!enabled || reduce || from === to) return
+        // A route without a scene (e.g. /printing bouncing straight to /) ends the running act
         const scene = SCRIPT[to]
-        if (!scene) return
-        setRun({ key: Date.now(), ...scene })
+        setRun(scene ? { key: Date.now(), ...scene } : null)
+    }, [location.pathname, enabled, reduce])
+
+    // The end timer belongs to the act, not to the route: a quick second navigation must not cancel it,
+    // or the act (and the button hold below) stays on screen until a reload
+    useEffect(() => {
+        if (!run) return
         const t = setTimeout(() => setRun(null), pace * 1000 + 50)
         return () => clearTimeout(t)
-    }, [location.pathname, enabled, reduce, pace])
+    }, [run, pace])
 
     // Button booth: while the act covers the new page, physical 1/2/3 must not act on it unseen
     useEffect(() => {

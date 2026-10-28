@@ -20,19 +20,6 @@
     background: none !important;
 }
 
-/* ── LIVE CAMERA BACKGROUND ── (sizing is inline in Landing.tsx to handle rotation) */
-.liveCameraBackground {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    object-fit: cover;
-    z-index: 1 !important;
-    display: block !important;
-    background: #000000 !important;
-}
-
 /* ── CUSTOM BACKGROUND ── */
 .customBackground {
     position: fixed !important;
@@ -55,7 +42,6 @@
     opacity: 0;
 }
 
-.container.hasLiveCam::before,
 .container.hasCustomBg::before {
     opacity: 1;
 }
@@ -401,10 +387,87 @@
     border-color: var(--brand-orange);
 }
 
+.viewToggle {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 40px;
+    margin-left: 10px;
+    padding: 0 16px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #FFFFFF;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Physical button number (hidden in touch mode, like the other key badges) */
+.zoomKey {
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--brand-sun);
+    color: var(--brand-ink);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+:global(body.app-landscape) .zoomKey { display: none; }
+
 @keyframes shake {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-8px); }
     75% { transform: translateX(8px); }
+}
+
+/* ── LIVE PREVIEW (camera on): hero moves up and shrinks, the camera is a clean card bottom-left ── */
+.container.hasLiveCam .hero {
+    flex: 0 0 auto;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 4px 32px 12px;
+}
+
+.container.hasLiveCam .heroLogo { width: min(34%, 420px); }
+.container.hasLiveCam .headline { font-size: 64px; margin-top: -4px; }
+.container.hasLiveCam .ctaPrimary { font-size: 20px; padding: 10px 24px; gap: 12px; border-width: 4px; box-shadow: 0 6px 0 var(--brand-ink); }
+.container.hasLiveCam .ctaKey { width: 40px; height: 40px; font-size: 24px; border-width: 3px; }
+
+/* Free area under the hero; the card is fitted inside it from JS (useElementSize) */
+.liveArea {
+    position: relative;
+    z-index: 10;
+    flex: 1;
+    min-height: 0;
+    /* bottom clears the global fullscreen button (App.tsx, bottom-left) and the version label */
+    margin: 0 24px 68px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+}
+
+.liveCard {
+    position: relative;
+    overflow: hidden;
+    border: var(--ink-line);
+    border-radius: 20px;
+    background: #000000;
+    flex-shrink: 0;
+}
+
+.liveVideo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    object-fit: cover;
+    display: block;
 }
 
 /* ── PORTRAIT ── */
@@ -415,3 +478,11 @@
 :global(body.app-portrait) .ctaKey { width: 54px; height: 54px; font-size: 30px; }
 :global(body.app-portrait) .navbar { padding: 16px 20px; }
 :global(body.app-portrait) .cameraPickerBtn span:nth-child(2) { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Portrait live preview: stage is narrow and tall, so the hero can stay a bit larger */
+:global(body.app-portrait) .container.hasLiveCam .hero { gap: 16px; padding: 8px 24px 16px; }
+:global(body.app-portrait) .container.hasLiveCam .heroLogo { width: 58%; }
+:global(body.app-portrait) .container.hasLiveCam .headline { font-size: 72px; }
+:global(body.app-portrait) .container.hasLiveCam .ctaPrimary { font-size: 20px; padding: 10px 22px; }
+:global(body.app-portrait) .container.hasLiveCam .ctaKey { width: 40px; height: 40px; font-size: 24px; }
+:global(body.app-portrait) .liveArea { margin: 0 20px 68px; }

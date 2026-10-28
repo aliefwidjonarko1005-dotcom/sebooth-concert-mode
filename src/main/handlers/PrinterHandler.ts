@@ -6,6 +6,23 @@ import { PDFDocument, degrees } from 'pdf-lib'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
+// Printer drivers (e.g. DNP status monitor) can still pop a window: give the keyboard back to the kiosk
+function refocusKiosk(): void {
+    try {
+        const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+        if (!win) return
+        if (win.isMinimized()) win.restore()
+        // Windows blocks plain focus() from a background app; a brief always-on-top lets it take the foreground
+        win.setAlwaysOnTop(true)
+        win.show()
+        win.focus()
+        win.webContents.focus()
+        setTimeout(() => { if (!win.isDestroyed()) win.setAlwaysOnTop(false) }, 300)
+    } catch (e) {
+        console.warn('[PrinterHandler] Could not refocus the kiosk window:', (e as Error).message)
+    }
+}
+
 const execAsync = promisify(exec)
 
 /**
@@ -92,6 +109,8 @@ using System.Drawing.Printing;
 public class ImagePrinter {
     public static void Print(string file, string printer, int copies) {
         PrintDocument pd = new PrintDocument();
+        // No "Printing..." status dialog: by default .NET wraps the job in a WinForms dialog that steals focus from the kiosk
+        pd.PrintController = new StandardPrintController();
         pd.PrinterSettings.PrinterName = printer;
         pd.PrinterSettings.Copies = (short)copies;
 
@@ -123,7 +142,14 @@ Add-Type -TypeDefinition $code -ReferencedAssemblies System.Drawing
                     console.log(`Sending native print job to ${printerName} for ${numPages} copies...`)
                     console.log(`[PrinterHandler] PowerShell command length: ${base64Command.length}`)
                     
-                    await execAsync(`powershell -EncodedCommand ${base64Command}`)
+                    // windowsHide: a visible PowerShell console steals keyboard focus from the kiosk,
+                    // so the physical buttons (keys 1/2/3) stop reaching the app after every print
+                    try {
+                        await execAsync(`powershell -EncodedCommand ${base64Command}`, { windowsHide: true })
+                    } finally {
+                        refocusKiosk()
+                        setTimeout(refocusKiosk, 1500) // driver status windows can appear just after the job
+                    }
                     
                     console.log(`[PrinterHandler] Print job completed successfully`)
                     return { success: true }

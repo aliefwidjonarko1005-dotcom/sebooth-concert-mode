@@ -64,6 +64,8 @@ export class ConfigService {
         // Camera Preview Adjustments
         skipViewRequirement: false,
         cameraZoom: 1.0,
+        digitalZoom: 1.6, // default view (shared/viewZoom.ts); wide view = 1.0
+        homeLiveCamEnabled: true,
         cameraScaleX: 1.0,
         cameraScaleY: 1.0,
         cameraOffsetX: 0,

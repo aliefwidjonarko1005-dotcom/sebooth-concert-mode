@@ -7,6 +7,8 @@ import { startRoute } from './Tutorial'
 import { SeboothLogo } from '../components/brand/SeboothLogo'
 import { AmbientArt, DEFAULT_AMBIENT_ART } from '../components/brand/AmbientArt'
 import { useButtonHints, useInputMode } from '../components/ButtonRail/ButtonRail'
+import { useElementSize } from '../lib/useElementHeight'
+import { isWideView, toggleViewZoom } from '@shared/viewZoom'
 
 
 const ADMIN_PASSWORD = 'admin123'
@@ -22,7 +24,7 @@ function Landing(): JSX.Element {
     const navigate = useNavigate()
     const { cameras, selectedCamera, setCameras, selectCamera, setConnected, isConnected } = useCameraStore()
     const { frames, setActiveFrame } = useFrameStore()
-    const { config } = useAppConfig()
+    const { config, updateConfig } = useAppConfig()
 
     const isPortrait = config.appOrientation === 'portrait'
     const customBg = isPortrait ? config.customBgPortrait : config.customBgLandscape
@@ -40,8 +42,15 @@ function Landing(): JSX.Element {
     // Live Camera Background States
     const videoRef = useRef<HTMLVideoElement>(null)
     const streamRef = useRef<MediaStream | null>(null)
-    const [liveCameraEnabled, setLiveCameraEnabled] = useState(false)
+    // Admin default (homeLiveCamEnabled, on unless turned off); the navbar toggle overrides it until config changes
+    const homeLiveCam = config.homeLiveCamEnabled !== false
+    const [liveCameraEnabled, setLiveCameraEnabled] = useState(homeLiveCam)
+    useEffect(() => { setLiveCameraEnabled(homeLiveCam) }, [homeLiveCam])
     const [isCameraLoading, setIsCameraLoading] = useState(false)
+    // Live preview card (bottom-left): camera's own aspect, fitted into the free area under the hero
+    const liveAreaRef = useRef<HTMLDivElement>(null)
+    const liveArea = useElementSize(liveAreaRef)
+    const [camAspect, setCamAspect] = useState(16 / 9)
 
     // Check if video exists (simple check via extension or just try loading)
     useEffect(() => {
@@ -201,6 +210,12 @@ function Landing(): JSX.Element {
         }
     }, [isConnected, selectedCamera, setConnected, config.activeFrameId, config.concertMode, setActiveFrame, frames, navigate])
 
+    // Default view (160%) <-> wide view (100%) from the homepage: button 2 or the navbar pill; same crop as photo + clip
+    const wideView = isWideView(config.digitalZoom)
+    const toggleView = useCallback(() => {
+        updateConfig({ digitalZoom: toggleViewZoom(config.digitalZoom) })
+    }, [config.digitalZoom, updateConfig])
+
     // Keydown & Keyup listener for 5-second Key 1 Hold and Sequential PIN 123
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -251,6 +266,9 @@ function Landing(): JSX.Element {
                     }
                 }, 50)
 
+            } else if (e.key === '2') {
+                e.preventDefault()
+                if (liveCameraEnabled) toggleView()
             } else if (e.key === '3') {
                 e.preventDefault()
                 handleStart()
@@ -280,7 +298,7 @@ function Landing(): JSX.Element {
             window.removeEventListener('keyup', handleKeyUp)
             clearKey1Timer()
         }
-    }, [showAdminModal, pinSequence, handleStart, clearKey1Timer, navigate])
+    }, [showAdminModal, pinSequence, handleStart, clearKey1Timer, navigate, liveCameraEnabled, toggleView])
 
     const handleAdminSubmit = (e: React.FormEvent): void => {
         e.preventDefault()
@@ -296,7 +314,10 @@ function Landing(): JSX.Element {
     }
 
     const touch = useInputMode() === 'touch'
-    useButtonHints({ 3: { label: 'Mulai foto', primary: true, onScreen: true } })
+    useButtonHints({
+        ...(liveCameraEnabled ? { 2: { label: wideView ? 'Default view' : 'Wide view', onScreen: true } } : {}),
+        3: { label: 'Mulai foto', primary: true, onScreen: true }
+    })
     const art = { ...DEFAULT_AMBIENT_ART, ...config.landingArt }
 
     return (
@@ -306,58 +327,6 @@ function Landing(): JSX.Element {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
         >
-            {/* ── LIVE CAMERA BACKGROUND ── */}
-            {liveCameraEnabled && (() => {
-                const rotation = config.cameraRotation || 0
-                const isRotated90or270 = rotation === 90 || rotation === 270
-
-                // All positioning is set inline to avoid CSS !important conflicts.
-                // For 90°/270°: the pre-rotation element must be large enough that
-                // after rotation the visible area covers the full container.
-                const baseStyle: React.CSSProperties = {
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100vw',
-                    height: '100vh',
-                    objectFit: 'cover' as const,
-                }
-
-                let videoStyle: React.CSSProperties
-
-                if (isRotated90or270) {
-                    videoStyle = {
-                        position: 'fixed',
-                        top: '50%',
-                        left: '50%',
-                        width: 'max(100vw, 100vh)',
-                        height: 'max(100vw, 100vh)',
-                        transform: `translate(-50%, -50%) rotate(${rotation}deg) scaleX(-1)`,
-                        objectFit: 'cover' as const,
-                    }
-                } else if (rotation === 180) {
-                    videoStyle = {
-                        ...baseStyle,
-                        transform: 'rotate(180deg) scaleX(-1)',
-                    }
-                } else {
-                    videoStyle = {
-                        ...baseStyle,
-                        transform: 'scaleX(-1)',
-                    }
-                }
-
-                return (
-                    <video
-                        ref={videoRef}
-                        className={styles.liveCameraBackground}
-                        autoPlay
-                        muted
-                        playsInline
-                        style={videoStyle}
-                    />
-                )
-            })()}
 
             {/* ── CUSTOM BACKGROUND (IMAGE OR VIDEO) ── */}
             {!liveCameraEnabled && hasCustomBg && (
@@ -381,7 +350,7 @@ function Landing(): JSX.Element {
 
             {/* ── ABSTRACT ANIMATION: backdrop, or a translucent overlay above camera / custom background ── */}
             <div className={styles.artLayer}>
-                <AmbientArt settings={art} overCamera={liveCameraEnabled || hasCustomBg} />
+                <AmbientArt settings={art} overCamera={!liveCameraEnabled && hasCustomBg} />
             </div>
 
             {/* ── TOP NAV ── */}
@@ -402,6 +371,13 @@ function Landing(): JSX.Element {
                             {!liveCameraEnabled && <path d="M1 1l22 22" />}
                         </svg>
                     </button>
+
+                    {liveCameraEnabled && (
+                        <button className={styles.viewToggle} onClick={toggleView} aria-label={wideView ? 'Ganti ke default view' : 'Ganti ke wide view'}>
+                            <span className={styles.zoomKey}>2</span>
+                            {wideView ? 'Wide view' : 'Default view'}
+                        </button>
+                    )}
                 </div>
 
                 {/* Right side: camera selector + admin trigger */}
@@ -486,6 +462,42 @@ function Landing(): JSX.Element {
                     )}
                 </button>
             </section>
+
+            {/* ── LIVE PREVIEW: clean card in the bottom-left, camera aspect kept, nothing drawn over it ── */}
+            {liveCameraEnabled && (
+                <div ref={liveAreaRef} className={styles.liveArea}>
+                    {(() => {
+                        const rotation = config.cameraRotation || 0
+                        const sideways = rotation === 90 || rotation === 270
+                        const aspect = sideways ? 1 / camAspect : camAspect // upright picture
+                        const fitsHeight = liveArea.width / Math.max(1, liveArea.height) > aspect
+                        const cardW = fitsHeight ? liveArea.height * aspect : liveArea.width
+                        const cardH = fitsHeight ? liveArea.height : liveArea.width / aspect
+                        const zoom = config.digitalZoom && config.digitalZoom > 1 ? ` scale(${config.digitalZoom})` : ''
+                        return (
+                            <div className={styles.liveCard} style={{ width: cardW, height: cardH }}>
+                                <video
+                                    ref={videoRef}
+                                    className={styles.liveVideo}
+                                    autoPlay
+                                    muted
+                                    playsInline
+                                    onLoadedMetadata={(e) => {
+                                        const v = e.currentTarget
+                                        if (v.videoWidth && v.videoHeight) setCamAspect(v.videoWidth / v.videoHeight)
+                                    }}
+                                    style={{
+                                        // sideways: the raw frame is laid out unrotated (swapped size), then turned upright
+                                        width: sideways ? cardH : cardW,
+                                        height: sideways ? cardW : cardH,
+                                        transform: `translate(-50%, -50%) rotate(${rotation}deg) scaleX(-1)${zoom}`
+                                    }}
+                                />
+                            </div>
+                        )
+                    })()}
+                </div>
+            )}
 
             {/* ── 5-Second Key 1 Hold Progress Bar ── */}
             {holdProgress > 0 && (

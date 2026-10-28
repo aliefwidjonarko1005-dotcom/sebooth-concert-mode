@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useFrameStore, useSessionStore, useAppConfig, useCameraStore } from '../stores'
 import { SessionTimer } from '../components/SessionTimer'
 import { useButtonHints, useRailStatus, useInputMode } from '../components/ButtonRail/ButtonRail'
+import { isWideView, toggleViewZoom } from '@shared/viewZoom'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import { CountdownBurst, SnapBurst } from '../components/CaptureArt/CaptureArt'
 import styles from './CaptureSession.module.css'
@@ -95,6 +96,8 @@ function CaptureSession(): JSX.Element {
     const [viewfinderSize, setViewfinderSize] = useState({ width: 0, height: 0 })
     // Native camera frame aspect (w/h); the viewfinder box uses it so the feed is shown uncropped
     const [videoAspect, setVideoAspect] = useState<number | null>(null)
+    // Camera is recording the live photo movie: its HDMI picture switches to the movie framing until the shutter
+    const [hdmiRecording, setHdmiRecording] = useState(false)
 
     const updateSafeArea = () => {
         const vf = viewfinderRef.current
@@ -553,7 +556,8 @@ function CaptureSession(): JSX.Element {
             console.log('[CaptureSession] Starting camera Live Photo recording...');
             window.api.camera.startRecordingLivePhoto(slot.id)
                 .then((res: any) => {
-                    if (!(res?.success && res.data) && hasCaptureCard) startMediaRecorder()
+                    if (res?.success && res.data) setHdmiRecording(true)
+                    else if (hasCaptureCard) startMediaRecorder()
                 })
                 .catch((err: any) => {
                     console.error('[CaptureSession] Failed to start camera Live Photo recording:', err);
@@ -829,6 +833,15 @@ function CaptureSession(): JSX.Element {
         }
     }, [concertTimeUp, captureState, navigate])
 
+    // Default view (160%) <-> wide view (100%) while idle: button 2, touch gets a pill in the top bar (same config as Landing)
+    const wideView = isWideView(config.digitalZoom)
+    const toggleView = () => updateConfig({ digitalZoom: toggleViewZoom(config.digitalZoom) })
+
+    // The camera stops recording before the shutter: drop the movie-framing fix once the countdown is over
+    useEffect(() => {
+        if (captureState !== 'countdown') setHdmiRecording(false)
+    }, [captureState])
+
     // Keyboard navigation
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -839,6 +852,9 @@ function CaptureSession(): JSX.Element {
                 if (e.key === '1') {
                     e.preventDefault()
                     setIsConfirmModalOpen(true)
+                } else if (e.key === '2') {
+                    e.preventDefault()
+                    toggleView()
                 } else if (e.key === '3') {
                     e.preventDefault()
                     handleReady()
@@ -864,7 +880,7 @@ function CaptureSession(): JSX.Element {
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [captureState, photos, captureSlots, reviewPhotoIndex])
+    }, [captureState, photos, captureSlots, reviewPhotoIndex, wideView])
 
 
     // Navigate to processing
@@ -916,7 +932,8 @@ function CaptureSession(): JSX.Element {
     }
 
     // Custom camera preview adjustments
-    const zoomVal = config.cameraZoom || 1.0;
+    // cameraZoom calibrates the preview to the photo; digitalZoom is the centre crop also applied to photo + clip
+    const zoomVal = (config.cameraZoom || 1.0) * (config.digitalZoom || 1.0);
     const offsetX = config.cameraOffsetX || 0;
     const offsetY = config.cameraOffsetY || 0;
     const scaleYVal = config.cameraScaleY !== undefined ? config.cameraScaleY : 1.0;
@@ -926,7 +943,22 @@ function CaptureSession(): JSX.Element {
     // For standard webcam/image preview (default 1.0)
     const scaleXStandardVal = config.cameraScaleX !== undefined ? config.cameraScaleX : 1.0;
 
-    const captureCardTransform = `translate(${offsetX}px, ${offsetY}px) scaleX(${-1 * scaleXCardVal * zoomVal}) scaleY(${scaleYVal * zoomVal})`;
+    // Movie mode (live photo recording) sends the sensor full-width in 16:9, still mode pillarboxes the 3:2 picture in the
+    // same HDMI frame, so during the countdown the preview would jump ~1.19x. Show the movie frame 'contain' at the still
+    // scale instead: k = still picture's share of the frame width; the white flash covers the switch back at the shutter.
+    const recordingFix = (() => {
+        if (!hdmiRecording || !videoAspect) return 1
+        const k = 1.5 / videoAspect
+        if (k >= 1) return 1
+        const sideways = config.cameraRotation === 90 || config.cameraRotation === 270
+        const ew = sideways ? viewfinderSize.height : viewfinderSize.width
+        const eh = sideways ? viewfinderSize.width : viewfinderSize.height
+        if (!ew || !eh) return 1
+        const a = ew / eh
+        return k * (a > videoAspect ? a / videoAspect : videoAspect / a) // still 'cover' scale relative to 'contain'
+    })()
+    const cardZoom = zoomVal * recordingFix
+    const captureCardTransform = `translate(${offsetX}px, ${offsetY}px) scaleX(${-1 * scaleXCardVal * cardZoom}) scaleY(${scaleYVal * cardZoom})`;
     const standardTransform = `translate(${offsetX}px, ${offsetY}px) scaleX(${-1 * scaleXStandardVal * zoomVal}) scaleY(${scaleYVal * zoomVal})`;
 
     const shotNumber = Math.min(photos.length + 1, captureSlots.length)
@@ -938,6 +970,7 @@ function CaptureSession(): JSX.Element {
     useButtonHints(captureState !== 'idle' ? {}
         : {
             1: { label: 'Batalkan sesi', onScreen: true },
+            2: { label: wideView ? 'Default view' : 'Wide view', onScreen: true },
             ...(cameraReady ? { 3: { label: allSlotsFilled ? 'Ulangi foto' : 'Ambil foto', primary: true, onScreen: true } } : {})
         })
     useRailStatus(`Foto ${shotNumber}/${captureSlots.length}`)
@@ -994,6 +1027,11 @@ function CaptureSession(): JSX.Element {
                 {touch && (
                     <span className={`${styles.operatorBtn} ${styles.progressChip}`}>Foto {shotNumber}/{captureSlots.length}</span>
                 )}
+                {touch && captureState === 'idle' && (
+                    <button type="button" className={`${styles.operatorBtn} ${styles.viewToggle}`} onClick={toggleView}>
+                        {wideView ? 'Wide view' : 'Default view'}
+                    </button>
+                )}
                 {/* Gear Button for Live View adjustment */}
                 <motion.button
                     initial={{ opacity: 0 }}
@@ -1031,7 +1069,7 @@ function CaptureSession(): JSX.Element {
                         const isRotated90or270 = rotation === 90 || rotation === 270
 
                         // Build video style based on rotation + zoom/scale/offset
-                        const getVideoStyle = (baseTransform: string): React.CSSProperties => {
+                        const getVideoStyle = (baseTransform: string, fit: 'cover' | 'contain' = 'cover'): React.CSSProperties => {
                             if (isRotated90or270) {
                                 return {
                                     position: 'absolute',
@@ -1040,18 +1078,18 @@ function CaptureSession(): JSX.Element {
                                     width: viewfinderSize.height ? `${viewfinderSize.height}px` : '100vh',
                                     height: viewfinderSize.width ? `${viewfinderSize.width}px` : '100vw',
                                     transform: `translate(-50%, -50%) rotate(${rotation}deg) ${baseTransform}`,
-                                    objectFit: 'cover'
+                                    objectFit: fit
                                 }
                             }
                             if (rotation === 180) {
                                 return {
                                     transform: `rotate(180deg) ${baseTransform}`,
-                                    objectFit: 'cover'
+                                    objectFit: fit
                                 }
                             }
                             return {
                                 transform: baseTransform,
-                                objectFit: 'cover' as const
+                                objectFit: fit
                             }
                         }
 
@@ -1063,7 +1101,7 @@ function CaptureSession(): JSX.Element {
                                     playsInline
                                     muted
                                     className={styles.video}
-                                    style={getVideoStyle(captureCardTransform)}
+                                    style={getVideoStyle(captureCardTransform, recordingFix !== 1 ? 'contain' : 'cover')}
                                     onLoadedMetadata={(e) => {
                                         const v = e.currentTarget
                                         if (v.videoWidth && v.videoHeight) setVideoAspect(v.videoWidth / v.videoHeight)

@@ -335,6 +335,8 @@ function OutputPage(): JSX.Element | null {
                                 : ''
 
                             const effectiveRotated = isRotated90or270
+                            // Raw clips are not cropped yet: show the same centre crop (digital zoom) as the photos/MP4
+                            const mediaScale = (photo.scale || 1) * (isVideo ? (config.digitalZoom || 1) : 1)
 
                             const mediaStyle: React.CSSProperties = {
                                 position: 'absolute',
@@ -344,8 +346,8 @@ function OutputPage(): JSX.Element | null {
                                 height: isVideo && effectiveRotated ? `${slot.width}px` : '100%',
                                 objectFit: 'cover',
                                 transform: isVideo && effectiveRotated
-                                    ? `translate(-50%, -50%) ${camRotTransform} translate(${photo.panX || 0}px, ${photo.panY || 0}px) scale(${photo.scale || 1})`
-                                    : `translate(${photo.panX || 0}px, ${photo.panY || 0}px) scale(${photo.scale || 1}) ${camRotTransform}`,
+                                    ? `translate(-50%, -50%) ${camRotTransform} translate(${photo.panX || 0}px, ${photo.panY || 0}px) scale(${mediaScale})`
+                                    : `translate(${photo.panX || 0}px, ${photo.panY || 0}px) scale(${mediaScale}) ${camRotTransform}`,
                                 transformOrigin: 'center center',
                                 ...filterStyle
                             }

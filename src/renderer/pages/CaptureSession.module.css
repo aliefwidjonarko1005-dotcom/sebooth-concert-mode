@@ -627,6 +627,12 @@
 }
 
 /* Touch mode: progress shown in the top bar (no rail to carry it) */
+/* Default / wide view pill (touch booth only; the button booth uses physical button 2) */
+.viewToggle {
+    color: #FFFFFF;
+    cursor: pointer;
+}
+
 .progressChip {
     background: var(--brand-ink);
     color: #FFFFFF;

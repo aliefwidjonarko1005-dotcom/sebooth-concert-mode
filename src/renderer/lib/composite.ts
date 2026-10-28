@@ -252,6 +252,7 @@ export const buildSaveParams = async (params: {
         overlay: { path: frame.overlayPath, filename: 'overlay.png' },
         mirrorOutput: params.mirror,
         cameraRotation: config.cameraRotation || 0,
+        digitalZoom: config.digitalZoom || 1,
         // EDSDK clips (camera movie, or the HDMI/EVF fallback) are the raw, unrotated sensor picture
         videoSource: config.cameraMode === 'edsdk' ? 'camera' as const : 'webcam' as const,
         frameConfig: {

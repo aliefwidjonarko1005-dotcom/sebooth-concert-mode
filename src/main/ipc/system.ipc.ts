@@ -21,6 +21,7 @@ export interface SaveSessionParams {
     overlay?: { path: string; filename: string }
     mirrorOutput?: boolean
     cameraRotation?: 0 | 90 | 180 | 270
+    digitalZoom?: number // centre crop factor for raw clips (photos are already cropped at capture)
     videoSource?: 'camera' | 'capture_card' | 'usb_liveview' | 'webcam' // camera = raw EDSDK clip (movie/HDMI/EVF)
     frameConfig?: {
         width: number
@@ -41,6 +42,13 @@ function cameraRotationFilter(rotation: number, captureCard: boolean): string {
     if (rot === 270) return 'transpose=2' // 90 deg CCW
     if (rot === 180) return 'hflip,vflip'
     return ''
+}
+
+// Digital zoom on a raw clip = centre crop at its own aspect (even size for x264). Same crop as the photo.
+function digitalZoomFilter(zoom?: number): string {
+    const z = Number(zoom) || 1
+    if (z <= 1.001) return ''
+    return `crop=trunc(iw/${z}/2)*2:trunc(ih/${z}/2)*2`
 }
 
 export function registerSystemHandlers(ipcMain: IpcMain): void {
@@ -349,7 +357,7 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                     const stripFilename = `live_video_${params.sessionId}.mp4`
                     const destPath = join(baseDir, stripFilename)
 
-                    const validInputs: { path: string; slot: { width: number; height: number; x: number; y: number; rotation?: number }; index: number }[] = []
+                    const validInputs: { path: string; slot: { width: number; height: number; x: number; y: number; rotation?: number }; index: number; fromPhoto?: boolean }[] = []
                     for (let i = 0; i < params.videos.length; i++) {
                         const v = params.videos[i]
                         const slot = params.frameConfig!.slots[i]
@@ -397,7 +405,7 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                                     })
                                     if (existsSync(fallbackVideoPath)) {
                                         console.log(`[SaveSession] Generated fallback static video for slot ${i} from photo`)
-                                        validInputs.push({ path: fallbackVideoPath, slot, index: validInputs.length })
+                                        validInputs.push({ path: fallbackVideoPath, slot, index: validInputs.length, fromPhoto: true })
                                     }
                                 } catch (ffErr) {
                                     console.warn(`[SaveSession] Failed to generate fallback video for slot ${i}:`, ffErr)
@@ -460,6 +468,11 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                                 const rotFilter = rot ? `rotate=${rotRad}:ow='iw*abs(cos(${rotRad}))+ih*abs(sin(${rotRad}))':oh='iw*abs(sin(${rotRad}))+ih*abs(cos(${rotRad}))':c=black@0.0` : ''
 
                                 let inputPipeline = `[${i + 1}:v]format=yuva420p`
+                                // Photo-made fallback clips are already cropped at capture
+                                const zoomFilter = input.fromPhoto ? '' : digitalZoomFilter(params.digitalZoom)
+                                if (zoomFilter) {
+                                    inputPipeline += `,${zoomFilter}`
+                                }
                                 if (camRotFilter) {
                                     inputPipeline += `,${camRotFilter}`
                                 }
@@ -580,8 +593,8 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                         const isCaptureCardLegacy = params.videoSource === 'camera' || params.videoSource === 'capture_card'
                         const camRotFilter = cameraRotationFilter(params.cameraRotation || 0, isCaptureCardLegacy)
 
-                        let videoFilter = ''
-                        if (camRotFilter) videoFilter = camRotFilter
+                        let videoFilter = digitalZoomFilter(params.digitalZoom)
+                        if (camRotFilter) videoFilter += videoFilter ? `,${camRotFilter}` : camRotFilter
                         if (params.mirrorOutput) {
                             videoFilter += videoFilter ? ',hflip' : 'hflip'
                         }
