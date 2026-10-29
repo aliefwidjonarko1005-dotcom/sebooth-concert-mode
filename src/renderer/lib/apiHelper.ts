@@ -101,5 +101,26 @@ export const apiHelper = {
         } catch (e) {
             return []
         }
+    },
+
+    // Save processed frame overlay (works in both Electron IPC and Remote Browser HTTP)
+    async saveFrameOverlay(dataUrl: string, filename: string): Promise<string | null> {
+        try {
+            if (isElectron) {
+                const res = await (window as any).api.system.saveFrameOverlay(dataUrl, filename)
+                return res.success ? res.data : null
+            } else {
+                const res = await fetch(`${baseUrl}/api/frames/overlay`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dataUrl, filename })
+                })
+                const json = await res.json()
+                return json.success ? json.filePath : null
+            }
+        } catch (e) {
+            console.error('Failed to save frame overlay:', e)
+            return null
+        }
     }
 }

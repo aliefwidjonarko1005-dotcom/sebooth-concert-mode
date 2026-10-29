@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useFrameStore, useAppConfig, useFilterStore, useSessionStore } from '../stores'
 import { DEFAULT_VIEW_ZOOM, WIDE_VIEW_ZOOM, isWideView } from '@shared/viewZoom'
-import { AppConfig, FrameConfig, PhotoSlot, PrinterDevice } from '@shared/types'
+import { AppConfig, FrameConfig, PhotoSlot, PrinterDevice, ChromaKeyConfig } from '@shared/types'
 import { v4 as uuidv4 } from 'uuid'
 import { apiHelper } from '../lib/apiHelper'
 import { getSessionHistory, SessionHistoryItem, getSupabase } from '../lib/supabase'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
+import { ChromaKeyModal } from '../components/ChromaKeyModal/ChromaKeyModal'
 import styles from './AdminDashboard.module.css'
 import { SeboothLogo } from '../components/brand/SeboothLogo'
 import { AmbientArt, AMBIENT_PALETTES, DEFAULT_AMBIENT_ART } from '../components/brand/AmbientArt'
@@ -44,6 +45,7 @@ function AdminDashboard(): JSX.Element {
     const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([])
     const [isLoadingDevices, setIsLoadingDevices] = useState(false)
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
+    const [isChromaModalOpen, setIsChromaModalOpen] = useState(false)
 
     // Camera Control State (for digiCamControl HTTP mode)
     const [cameraConnected, setCameraConnected] = useState(false)
@@ -774,6 +776,34 @@ function AdminDashboard(): JSX.Element {
         }
     }
 
+    // Handle Chroma Key apply (updates transparent overlay, preserves original image, optionally updates detected slots)
+    const handleApplyChromaKey = async (params: {
+        newOverlayPath: string
+        originalOverlayPath: string
+        chromaKeyConfig: ChromaKeyConfig
+        detectedSlots?: PhotoSlot[]
+    }): Promise<void> => {
+        if (!selectedFrame) return
+        const updates: Partial<FrameConfig> = {
+            overlayPath: params.newOverlayPath,
+            originalOverlayPath: params.originalOverlayPath,
+            chromaKey: params.chromaKeyConfig
+        }
+        if (params.detectedSlots && params.detectedSlots.length > 0) {
+            updates.slots = params.detectedSlots
+        }
+        updateFrame(selectedFrame.id, updates)
+    }
+
+    // Handle Chroma Key revert to original untouched frame image
+    const handleRevertChromaKey = async (): Promise<void> => {
+        if (!selectedFrame || !selectedFrame.originalOverlayPath) return
+        updateFrame(selectedFrame.id, {
+            overlayPath: selectedFrame.originalOverlayPath,
+            chromaKey: undefined
+        })
+    }
+
     // Toggle frame as active (allows multiple active frames)
     const handleSetActive = (): void => {
         if (selectedFrame) {
@@ -901,7 +931,10 @@ function AdminDashboard(): JSX.Element {
                                         onClick={() => setSelectedFrameId(frame.id)}
                                     >
                                         <div className={styles.framePreview}>
-                                            <img src={`file://${frame.overlayPath}`} alt={frame.name} />
+                                            <img
+                                                src={frame.overlayPath.startsWith('http') || frame.overlayPath.startsWith('data:') ? frame.overlayPath : `file:///${frame.overlayPath.replace(/\\/g, '/')}`}
+                                                alt={frame.name}
+                                            />
                                         </div>
                                         <div className={styles.frameInfo}>
                                             <span className={styles.frameName}>
@@ -963,6 +996,13 @@ function AdminDashboard(): JSX.Element {
                                                 onChange={(e) => updateFrame(selectedFrame.id, { canvasHeight: parseInt(e.target.value) })}
                                             />
                                         </div>
+                                        <button
+                                            className={styles.chromaKeyButton}
+                                            onClick={() => setIsChromaModalOpen(true)}
+                                            title="Atur transparansi slot foto dengan Chroma Key (green screen / warna lain)"
+                                        >
+                                            ✨ Chroma Key (Slot Bolong)
+                                        </button>
                                         <button className={styles.addSlotButton} onClick={handleAddSlot}>
                                             + Add Photo Slot
                                         </button>
@@ -1014,7 +1054,7 @@ function AdminDashboard(): JSX.Element {
                                         >
                                             {/* Frame overlay preview */}
                                             <img
-                                                src={`file://${selectedFrame.overlayPath}`}
+                                                src={selectedFrame.overlayPath.startsWith('http') || selectedFrame.overlayPath.startsWith('data:') ? selectedFrame.overlayPath : `file:///${selectedFrame.overlayPath.replace(/\\/g, '/')}`}
                                                 alt="Frame"
                                                 className={styles.frameOverlay}
                                             />
@@ -1145,6 +1185,55 @@ function AdminDashboard(): JSX.Element {
                                     <span className={styles.slotCount}>{selectedFrame.slots.length} slots</span>
                                 </div>
                                 <div className={styles.slotListSidebar}>
+                                    {/* Chroma Key Settings Card */}
+                                    <div className={styles.chromaKeyCard}>
+                                        <div className={styles.chromaKeyCardHeader}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ fontSize: '15px' }}>✨</span>
+                                                <h4 style={{ margin: 0, fontSize: '14px', color: 'white' }}>Chroma Key (Slot Bolong)</h4>
+                                            </div>
+                                            {selectedFrame.chromaKey?.enabled ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span style={{
+                                                        display: 'inline-block',
+                                                        width: '12px',
+                                                        height: '12px',
+                                                        borderRadius: '50%',
+                                                        backgroundColor: selectedFrame.chromaKey.color,
+                                                        border: '1px solid rgba(255,255,255,0.4)'
+                                                    }} />
+                                                    <span className={styles.activeBadge} style={{ background: 'var(--color-success)' }}>Aktif</span>
+                                                </div>
+                                            ) : (
+                                                <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>Nonaktif</span>
+                                            )}
+                                        </div>
+                                        <p style={{ fontSize: '12px', color: 'var(--color-text-tertiary)', margin: '8px 0 10px 0', lineHeight: 1.4 }}>
+                                            {selectedFrame.chromaKey?.enabled
+                                                ? `Warna ${selectedFrame.chromaKey.color} dilubangi transparan (Toleransi: ${selectedFrame.chromaKey.tolerance}%).`
+                                                : 'Lubangi warna background slot (green screen) agar foto dapat tampil di belakang frame.'}
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <button
+                                                className={styles.addButton}
+                                                style={{ flex: 1, padding: '5px 8px', fontSize: '12px', textAlign: 'center' }}
+                                                onClick={() => setIsChromaModalOpen(true)}
+                                            >
+                                                {selectedFrame.chromaKey?.enabled ? 'Ubah Chroma Key' : '+ Atur Chroma Key'}
+                                            </button>
+                                            {selectedFrame.originalOverlayPath && (
+                                                <button
+                                                    className={styles.clearSlotsButton}
+                                                    style={{ padding: '5px 8px', fontSize: '12px' }}
+                                                    onClick={handleRevertChromaKey}
+                                                    title="Kembalikan ke gambar asli sebelum chroma key"
+                                                >
+                                                    Reset
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
                                     {/* QR Code Box settings */}
                                     <div className={styles.qrSlotSection}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -3567,6 +3656,16 @@ function AdminDashboard(): JSX.Element {
                     navigate('/')
                 }}
             />
+
+            {isChromaModalOpen && selectedFrame && (
+                <ChromaKeyModal
+                    isOpen={isChromaModalOpen}
+                    frame={selectedFrame}
+                    onClose={() => setIsChromaModalOpen(false)}
+                    onApply={handleApplyChromaKey}
+                    onRevertToOriginal={handleRevertChromaKey}
+                />
+            )}
         </motion.div >
     )
 }

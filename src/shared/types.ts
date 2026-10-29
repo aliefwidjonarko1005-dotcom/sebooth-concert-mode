@@ -68,15 +68,26 @@ export interface QRSlot {
     enabled: boolean
 }
 
+export interface ChromaKeyConfig {
+    enabled: boolean
+    color: string        // Hex color e.g. '#00FF00'
+    tolerance: number    // 1 - 100
+    smoothness: number   // 0 - 50
+    originalOverlayPath?: string
+    detectedSlotsCount?: number
+}
+
 export interface FrameConfig {
     id: string
     name: string
     overlayPath: string
+    originalOverlayPath?: string
     slots: PhotoSlot[]
     canvasWidth: number
     canvasHeight: number
     qrSlot?: QRSlot
     qrSlots?: QRSlot[]
+    chromaKey?: ChromaKeyConfig
 }
 
 // Session Types

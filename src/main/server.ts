@@ -25,6 +25,11 @@ export function startLocalServer(port = 5050) {
     // E.g., http://<ip>:5050/Session_uuid/photo_1.jpg
     server.use(express.static(sessionsDir))
     
+    // Serve processed frame overlays
+    const framesDir = join(app.getPath('userData'), 'frames')
+    if (!existsSync(framesDir)) mkdirSync(framesDir, { recursive: true })
+    server.use('/frames', express.static(framesDir))
+
     // Serve the React Admin Dashboard (Vite Build) statically
     server.use(express.static(join(__dirname, '../renderer')))
 
@@ -245,6 +250,23 @@ export function startLocalServer(port = 5050) {
             res.json({ success: true, config: newConfig })
         } catch (e) {
             res.status(500).json({ error: 'Failed to update config' })
+        }
+    })
+
+    // Save frame overlay from remote admin browser
+    server.post('/api/frames/overlay', (req, res) => {
+        try {
+            const { dataUrl, filename } = req.body
+            const targetFramesDir = join(app.getPath('userData'), 'frames')
+            if (!existsSync(targetFramesDir)) mkdirSync(targetFramesDir, { recursive: true })
+            const matches = dataUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/)
+            if (!matches) return res.status(400).json({ success: false, error: 'Invalid data URL' })
+            const buffer = Buffer.from(matches[2], 'base64')
+            const filePath = join(targetFramesDir, filename)
+            writeFileSync(filePath, buffer)
+            res.json({ success: true, filePath })
+        } catch (e: any) {
+            res.status(500).json({ success: false, error: e.message })
         }
     })
 

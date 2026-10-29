@@ -260,6 +260,32 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
         }
     })
 
+    // Save processed frame overlay permanently in userData/frames
+    ipcMain.handle('system:save-frame-overlay', async (_, dataUrl: string, filename: string): Promise<APIResponse<string>> => {
+        try {
+            const framesDir = join(app.getPath('userData'), 'frames')
+            if (!existsSync(framesDir)) {
+                mkdirSync(framesDir, { recursive: true })
+            }
+
+            const matches = dataUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/)
+            if (!matches) {
+                return { success: false, error: 'Invalid data URL format' }
+            }
+
+            const base64Data = matches[2]
+            const buffer = Buffer.from(base64Data, 'base64')
+
+            const filePath = join(framesDir, filename)
+            writeFileSync(filePath, buffer)
+
+            return { success: true, data: filePath }
+        } catch (error) {
+            const err = error as Error
+            return { success: false, error: err.message }
+        }
+    })
+
     // Save entire session locally for backup
     const saveSessionLocally = async (_: unknown, params: SaveSessionParams
     ): Promise<APIResponse<{ path: string; filename: string; mimeType: string }[]>> => {

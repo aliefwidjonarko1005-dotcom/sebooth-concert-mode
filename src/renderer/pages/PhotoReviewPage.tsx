@@ -208,7 +208,7 @@ function PhotoReviewPage(): JSX.Element | null {
                                 {/* Frame Overlay */}
                                 {sessionFrame.overlayPath && (
                                     <img
-                                        src={sessionFrame.overlayPath}
+                                        src={sessionFrame.overlayPath.startsWith('http') || sessionFrame.overlayPath.startsWith('data:') ? sessionFrame.overlayPath : `file:///${sessionFrame.overlayPath.replace(/\\/g, '/')}`}
                                         alt="Frame Overlay"
                                         className={styles.frameOverlayImage}
                                     />

@@ -306,7 +306,7 @@ function OutputPage(): JSX.Element | null {
                         {sessionFrame.slots.map(slot => {
                             const photo = getPhotoForSlot(sessionFrame, photos, slot)
                             if (!photo) return null
-                            
+
                             const isVideo = !!photo.videoPath
                             let src = photo.imagePath
                             if (isVideo) {
@@ -316,7 +316,7 @@ function OutputPage(): JSX.Element | null {
                                     src = `file:///${photo.videoPath!.replace(/\\/g, '/')}`
                                 }
                             }
-                            
+
                             const cameraRotation = config.cameraRotation || 0
                             const isRotated90or270 = cameraRotation === 90 || cameraRotation === 270
 
@@ -327,12 +327,12 @@ function OutputPage(): JSX.Element | null {
                             const camRotTransform = isCaptureCardSource
                                 ? `${isMirrored ? 'scaleX(-1) ' : ''}rotate(${-cameraRotation}deg)`
                                 : isVideo && isRotated90or270
-                                ? `rotate(${cameraRotation}deg) scaleX(-1)`
-                                : isVideo && cameraRotation === 180
-                                ? `rotate(180deg) scaleX(-1)`
-                                : isVideo && isMirrored
-                                ? `scaleX(-1)`
-                                : ''
+                                    ? `rotate(${cameraRotation}deg) scaleX(-1)`
+                                    : isVideo && cameraRotation === 180
+                                        ? `rotate(180deg) scaleX(-1)`
+                                        : isVideo && isMirrored
+                                            ? `scaleX(-1)`
+                                            : ''
 
                             const effectiveRotated = isRotated90or270
                             // Raw clips are not cropped yet: show the same centre crop (digital zoom) as the photos/MP4
@@ -370,8 +370,8 @@ function OutputPage(): JSX.Element | null {
                                 </div>
                             )
                         })}
-                        <img 
-                            src={`file:///${sessionFrame.overlayPath.replace(/\\/g, '/')}`} 
+                        <img
+                            src={`file:///${sessionFrame.overlayPath.replace(/\\/g, '/')}`}
                             style={{
                                 position: 'absolute',
                                 top: 0,
@@ -379,8 +379,8 @@ function OutputPage(): JSX.Element | null {
                                 width: '100%',
                                 height: '100%',
                                 pointerEvents: 'none'
-                            }} 
-                            alt="Frame Overlay" 
+                            }}
+                            alt="Frame Overlay"
                         />
                     </div>
                 </div>
@@ -409,15 +409,15 @@ function OutputPage(): JSX.Element | null {
             {/* Loading / Uploading Overlay */}
             <AnimatePresence>
                 {(isProcessing || isUploading) && (
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         className={styles.loadingOverlay}
                     >
-                        <Lottie 
-                            animationData={PA22Animation} 
-                            loop={true} 
+                        <Lottie
+                            animationData={PA22Animation}
+                            loop={true}
                             style={{ width: 360, height: 360, marginBottom: 'var(--spacing-xl)' }}
                         />
                         <p>{isUploading ? 'Uploading to Cloud...' : 'Processing Magic...'}</p>
@@ -499,7 +499,7 @@ function OutputPage(): JSX.Element | null {
             {/* Bottom Floating Control Bar with Buttons 1: Back, 2: Next, 3: Lanjutkan */}
             <div className={styles.bottomActionBar}>
                 {/* Button 1: Back (Prev Media) */}
-                <button 
+                <button
                     className={`${styles.actionBtn} ${styles.btnBack}`}
                     onClick={handlePrevMedia}
                     title="Tekan 1 untuk Kembali ke media sebelumnya"
@@ -512,7 +512,7 @@ function OutputPage(): JSX.Element | null {
                 </button>
 
                 {/* Button 2: Next Media */}
-                <button 
+                <button
                     className={`${styles.actionBtn} ${styles.btnNextMedia}`}
                     onClick={handleNextMedia}
                     title="Tekan 2 untuk melihat media selanjutnya"
@@ -525,7 +525,7 @@ function OutputPage(): JSX.Element | null {
                 </button>
 
                 {/* Button 3: Lanjutkan */}
-                <button 
+                <button
                     className={`${styles.actionBtn} ${styles.btnProceed}`}
                     onClick={handleProceed}
                     title="Tekan 3 untuk lanjut ke halaman Sharing"

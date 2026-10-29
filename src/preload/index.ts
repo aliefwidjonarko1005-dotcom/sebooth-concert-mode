@@ -144,6 +144,9 @@ const api = {
         saveDataUrl: (dataUrl: string, filename: string): Promise<APIResponse<string>> =>
             ipcRenderer.invoke('system:save-data-url', dataUrl, filename),
 
+        saveFrameOverlay: (dataUrl: string, filename: string): Promise<APIResponse<string>> =>
+            ipcRenderer.invoke('system:save-frame-overlay', dataUrl, filename),
+
         saveSessionLocally: (params: {
             sessionId: string
             stripDataUrl?: string

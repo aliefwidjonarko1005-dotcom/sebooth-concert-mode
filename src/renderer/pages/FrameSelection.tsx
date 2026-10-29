@@ -249,7 +249,7 @@ function FrameSelection(): JSX.Element {
                                             })}
                                             {/* Frame overlay on top */}
                                             <img
-                                                src={`file://${frame.overlayPath}`}
+                                                src={frame.overlayPath.startsWith('http') || frame.overlayPath.startsWith('data:') ? frame.overlayPath : `file:///${frame.overlayPath.replace(/\\/g, '/')}`}
                                                 alt={frame.name}
                                                 className={styles.frameOverlayImage}
                                             />

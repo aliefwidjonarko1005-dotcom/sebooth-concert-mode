@@ -12,12 +12,17 @@ const FILTER_CSS: Record<string, string> = {
 export const loadImage = (src: string): Promise<HTMLImageElement> => {
     return new Promise((resolve, reject) => {
         const img = new Image()
-        if (!src.startsWith('file:///') && !src.startsWith('data:')) {
+        let safeSrc = src
+        if (!safeSrc.startsWith('http') && !safeSrc.startsWith('data:') && !safeSrc.startsWith('blob:')) {
+            const normalized = safeSrc.replace(/\\/g, '/')
+            safeSrc = normalized.startsWith('file:///') ? normalized : `file:///${normalized.replace(/^file:\/\//, '')}`
+        }
+        if (!safeSrc.startsWith('file:///') && !safeSrc.startsWith('data:')) {
             img.crossOrigin = 'anonymous'
         }
         img.onload = () => resolve(img)
         img.onerror = reject
-        img.src = src
+        img.src = safeSrc
     })
 }
 
@@ -140,7 +145,7 @@ export const buildComposite = async (params: {
     try {
         ctx.filter = 'none'
 
-        const frameImg = await loadImage(`file://${frame.overlayPath}`)
+        const frameImg = await loadImage(frame.overlayPath)
         const frameAspect = frameImg.width / frameImg.height
         const canvasAspect = canvas.width / canvas.height
 
