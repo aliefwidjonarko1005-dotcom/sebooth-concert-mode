@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useFrameStore, useAppConfig, useFilterStore, useSessionStore } from '../stores'
+import { useFrameStore, useAppConfig, useFilterStore, useSessionStore, useEventSessionStore } from '../stores'
 import { DEFAULT_VIEW_ZOOM, WIDE_VIEW_ZOOM, isWideView } from '@shared/viewZoom'
 import { AppConfig, FrameConfig, PhotoSlot, PrinterDevice, ChromaKeyConfig } from '@shared/types'
 import { v4 as uuidv4 } from 'uuid'
@@ -9,6 +9,7 @@ import { apiHelper } from '../lib/apiHelper'
 import { getSessionHistory, SessionHistoryItem, getSupabase } from '../lib/supabase'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import { ChromaKeyModal } from '../components/ChromaKeyModal/ChromaKeyModal'
+import { EventSessionTab } from '../components/EventSessionTab/EventSessionTab'
 import styles from './AdminDashboard.module.css'
 import { SeboothLogo } from '../components/brand/SeboothLogo'
 import { AmbientArt, AMBIENT_PALETTES, DEFAULT_AMBIENT_ART } from '../components/brand/AmbientArt'
@@ -21,8 +22,9 @@ function AdminDashboard(): JSX.Element {
     const { config, updateConfig } = useAppConfig()
     const { filters, addFilter, removeFilter } = useFilterStore()
     const { endSession } = useSessionStore()
+    const { activeEvent } = useEventSessionStore()
 
-    const [activeTab, setActiveTab] = useState<'frames' | 'timers' | 'filters' | 'payment' | 'history' | 'sharing' | 'printers' | 'queue' | 'webhook' | 'button-indicator'>('frames')
+    const [activeTab, setActiveTab] = useState<'frames' | 'timers' | 'filters' | 'payment' | 'history' | 'sharing' | 'printers' | 'queue' | 'webhook' | 'button-indicator' | 'event'>('frames')
     const [cloudQueue, setCloudQueue] = useState<any[]>([])
     const [isLoadingQueue, setIsLoadingQueue] = useState(false)
     const [eventsList, setEventsList] = useState<{ id: string; name: string; booth_name: string }[]>([])
@@ -840,6 +842,29 @@ function AdminDashboard(): JSX.Element {
                     Sebooth Admin
                 </h1>
                 <div className={styles.headerActions}>
+                    {activeEvent && (
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('event')}
+                            style={{
+                                fontSize: '13px',
+                                background: 'rgba(16, 185, 129, 0.15)',
+                                border: '1px solid #10b981',
+                                color: '#10b981',
+                                padding: '4px 12px',
+                                borderRadius: '20px',
+                                marginRight: '10px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px'
+                            }}
+                        >
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+                            Event Aktif: {activeEvent.eventName}
+                        </button>
+                    )}
                     <span style={{ fontSize: '14px', color: '#10b981', marginRight: '15px', fontWeight: 'bold' }}>
                         Tersimpan otomatis
                     </span>
@@ -848,6 +873,12 @@ function AdminDashboard(): JSX.Element {
 
             {/* Tabs */}
             <nav className={styles.tabs}>
+                <button
+                    className={`${styles.tab} ${activeTab === 'event' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('event')}
+                >
+                    ⏱️ Sesi Event {activeEvent ? '🟢' : ''}
+                </button>
                 <button
                     className={`${styles.tab} ${activeTab === 'frames' ? styles.active : ''}`}
                     onClick={() => setActiveTab('frames')}
@@ -1831,6 +1862,24 @@ function AdminDashboard(): JSX.Element {
                                     </label>
                                     <span className={styles.toggleLabel}>
                                         {config.skipViewRequirement ? 'Skip Requirement (Langsung Bisa Lanjut)' : 'Mewajibkan Lihat 1 per 1 Hasil'}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className={styles.timerCard} style={{ gridColumn: '1 / -1' }}>
+                                <h3>⏩ Lewati Halaman Tutorial (Skip Tutorial)</h3>
+                                <p>Aktifkan agar saat pengunjung menekan tombol mulai di beranda, sesi langsung masuk ke pemilihan frame tanpa menampilkan panduan tutorial.</p>
+                                <div className={styles.timerToggle}>
+                                    <label className={styles.toggleSwitch}>
+                                        <input
+                                            type="checkbox"
+                                            checked={config.skipTutorial || false}
+                                            onChange={(e) => updateConfig({ skipTutorial: e.target.checked })}
+                                        />
+                                        <span className={styles.toggleSlider}></span>
+                                    </label>
+                                    <span className={styles.toggleLabel}>
+                                        {config.skipTutorial ? 'Tutorial Dilewati (Langsung ke Pilihan Frame)' : 'Tutorial Ditampilkan (Standar)'}
                                     </span>
                                 </div>
                             </div>
@@ -3645,6 +3694,8 @@ function AdminDashboard(): JSX.Element {
                         })}
                     </div>
                 )}
+
+                {activeTab === 'event' && <EventSessionTab />}
 
             </main >
 

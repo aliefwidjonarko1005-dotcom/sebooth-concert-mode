@@ -278,6 +278,19 @@ export function registerCameraHandlers(ipcMain: IpcMain): void {
         }
     })
 
+    // Check if live view is already active (used by retake fast-path to skip HDMI wait)
+    ipcMain.handle('camera:is-liveview-active', async (): Promise<APIResponse<boolean>> => {
+        try {
+            if ('isLiveViewActive' in cameraHandler) {
+                const active = (cameraHandler as any).isLiveViewActive()
+                return { success: true, data: active }
+            }
+            return { success: true, data: false }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+
     ipcMain.handle('camera:get-liveview-url', async (): Promise<APIResponse<string>> => {
         try {
             if ('getLiveViewUrl' in cameraHandler) {

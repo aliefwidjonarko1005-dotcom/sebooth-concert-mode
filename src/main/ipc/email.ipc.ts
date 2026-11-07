@@ -116,7 +116,7 @@ export function registerEmailHandlers(ipcMain: IpcMain): void {
                 let sessionPath = join(sessionsRoot, `Session_${params.sessionId}`)
                 if (!existsSync(sessionPath) && existsSync(sessionsRoot)) {
                     const folders = readdirSync(sessionsRoot)
-                    const match = folders.find(f => f.startsWith('Session_') && f.endsWith(params.sessionId))
+                    const match = folders.find(f => f.includes(params.sessionId))
                     if (match) sessionPath = join(sessionsRoot, match)
                 }
 

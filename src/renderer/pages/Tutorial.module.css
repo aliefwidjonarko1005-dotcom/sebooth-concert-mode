@@ -290,3 +290,55 @@ button.cta:active {
 :global(body.app-landscape) .strip {
     width: clamp(400px, 48vh, 520px);
 }
+
+.topActions {
+    position: absolute;
+    top: 24px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 48px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.backBtn {
+    pointer-events: auto;
+    background: rgba(0, 17, 58, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 10px 22px;
+    border-radius: 999px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s;
+}
+
+.backBtn:hover {
+    background: rgba(0, 17, 58, 0.7);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.skipBtn {
+    pointer-events: auto;
+    background: rgba(255, 69, 0, 0.2);
+    border: 1px solid rgba(255, 69, 0, 0.5);
+    color: #ff9d66;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 10px 24px;
+    border-radius: 999px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.2s;
+}
+
+.skipBtn:hover {
+    background: rgba(255, 69, 0, 0.35);
+    border-color: #ff4500;
+    color: #ffffff;
+}

@@ -13,6 +13,8 @@ ffmpeg.setFfmpegPath(getFFmpegPath())
 
 export interface SaveSessionParams {
     sessionId: string
+    eventName?: string
+    createdAt?: number | string
     stripDataUrl?: string
     gifDataUrl?: string
     qrCodeDataUrl?: string
@@ -286,11 +288,31 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
         }
     })
 
+    // Helper to resolve or create session folder name with event name and timestamp
+    const getSessionFolderPath = (sessionsRoot: string, sessionId: string, eventName?: string, createdAt?: number | string): string => {
+        if (existsSync(sessionsRoot)) {
+            const folders = readdirSync(sessionsRoot)
+            const existing = folders.find(f => f.includes(sessionId))
+            if (existing) {
+                return join(sessionsRoot, existing)
+            }
+        }
+
+        const d = createdAt ? new Date(createdAt) : new Date()
+        const pad = (n: number) => String(n).padStart(2, '0')
+        const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`
+        const rawEventName = (eventName && eventName.trim()) ? eventName.trim() : 'Event'
+        const safeEventName = rawEventName.replace(/[<>:"/\\|?*]/g, '_').trim().replace(/\s+/g, '_')
+
+        return join(sessionsRoot, `Session_${safeEventName}_${dateStr}_${sessionId}`)
+    }
+
     // Save entire session locally for backup
     const saveSessionLocally = async (_: unknown, params: SaveSessionParams
     ): Promise<APIResponse<{ path: string; filename: string; mimeType: string }[]>> => {
         try {
-            const baseDir = join(app.getPath('documents'), 'Sebooth', 'Sessions', `Session_${params.sessionId}`)
+            const sessionsRoot = join(app.getPath('documents'), 'Sebooth', 'Sessions')
+            const baseDir = getSessionFolderPath(sessionsRoot, params.sessionId, params.eventName, params.createdAt)
 
             if (!existsSync(baseDir)) {
                 mkdirSync(baseDir, { recursive: true })
@@ -732,14 +754,23 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
     }): Promise<APIResponse<string>> => {
         try {
             const sessionsRoot = join(app.getPath('documents'), 'Sebooth', 'Sessions')
-            const oldFolder = join(sessionsRoot, `Session_${params.sessionId}`)
+            if (!existsSync(sessionsRoot)) return { success: false, error: 'Sessions folder not found' }
 
-            // Sanitize email for use in folder name (replace @ and . with safe chars)
+            const folders = readdirSync(sessionsRoot)
+            const match = folders.find(f => f.includes(params.sessionId))
+            if (!match) return { success: false, error: 'Session folder not found' }
+
+            const oldFolder = join(sessionsRoot, match)
             const safeEmail = params.email.replace(/@/g, '_at_').replace(/[^a-zA-Z0-9._-]/g, '_')
-            const newFolderName = `Session_${safeEmail}_${params.sessionId}`
+
+            if (match.includes(safeEmail)) {
+                return { success: true, data: match }
+            }
+
+            const newFolderName = `${match}_${safeEmail}`
             const newFolder = join(sessionsRoot, newFolderName)
 
-            if (existsSync(oldFolder) && !existsSync(newFolder)) {
+            if (!existsSync(newFolder)) {
                 renameSync(oldFolder, newFolder)
                 console.log(`Renamed session folder: ${newFolderName}`)
             }
@@ -762,9 +793,9 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
             if (existsSync(exactPath)) {
                 sessionPath = exactPath
             } else if (existsSync(sessionsRoot)) {
-                // Scan for folder ending with the sessionId
+                // Scan for folder containing the sessionId
                 const folders = readdirSync(sessionsRoot)
-                const match = folders.find(f => f.startsWith('Session_') && f.endsWith(sessionId))
+                const match = folders.find(f => f.includes(sessionId))
                 if (match) sessionPath = join(sessionsRoot, match)
             }
 

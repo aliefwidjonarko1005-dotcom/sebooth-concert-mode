@@ -21,9 +21,9 @@ const WHITE = '#ffffff'
 // Seconds before the tutorial moves on by itself (it is not a decision, so no need to wait)
 const AUTO_CONTINUE_SECONDS = 45
 
-/** Where "start a session" goes: concert mode skips the tutorial. */
-export function startRoute(concertMode?: boolean): string {
-    return concertMode ? '/frames' : '/tutorial'
+/** Where "start a session" goes: concert mode or skipTutorial skips the tutorial. */
+export function startRoute(concertMode?: boolean, skipTutorial?: boolean): string {
+    return (concertMode || skipTutorial) ? '/frames' : '/tutorial'
 }
 
 function FramePic() {
@@ -128,9 +128,16 @@ function Tutorial(): JSX.Element {
 
     const goOn = (): void => navigate('/frames')
 
+    // If skipTutorial is enabled in Admin, immediately forward to frames
+    useEffect(() => {
+        if (config.skipTutorial) {
+            navigate('/frames', { replace: true })
+        }
+    }, [config.skipTutorial, navigate])
+
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
-            if (e.key === '3') {
+            if (e.key === '2' || e.key === '3') {
                 e.preventDefault()
                 navigate('/frames')
             } else if (e.key === '1') {
@@ -144,6 +151,7 @@ function Tutorial(): JSX.Element {
 
     useButtonHints({
         1: { label: 'Kembali', onScreen: true },
+        2: { label: 'Lewati', onScreen: true },
         3: { label: 'Mengerti, lanjut', primary: true, onScreen: true }
     })
 
@@ -157,9 +165,14 @@ function Tutorial(): JSX.Element {
             />
 
             {touch && (
-                <button type="button" className={styles.backBtn} onClick={() => setIsConfirmModalOpen(true)}>
-                    Kembali
-                </button>
+                <div className={styles.topActions}>
+                    <button type="button" className={styles.backBtn} onClick={() => setIsConfirmModalOpen(true)}>
+                        ← Kembali
+                    </button>
+                    <button type="button" className={styles.skipBtn} onClick={goOn}>
+                        Lewati Tutorial ➔
+                    </button>
+                </div>
             )}
 
             <section className={styles.intro}>

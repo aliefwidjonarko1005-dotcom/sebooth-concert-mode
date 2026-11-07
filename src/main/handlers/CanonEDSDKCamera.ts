@@ -759,6 +759,13 @@ try {
      * Start EDSDK Live View
      */
     async startLiveView(): Promise<boolean> {
+        // Fast path: if live view is already active on the running helper, skip re-initialization.
+        // This makes retake navigation instant instead of waiting for START_LV + HDMI stabilization.
+        if (this.liveViewActive && this.helperProcess) {
+            console.log('[CanonEDSDK] Live view already active on running helper — skipping re-init (retake fast path)')
+            return true
+        }
+
         if (!this.helperProcess) {
             console.log('[CanonEDSDK] Helper process not running in startLiveView. Attempting to auto-connect...')
             try {
@@ -1168,7 +1175,7 @@ try {
      * Check if live view is currently active
      */
     isLiveViewActive(): boolean {
-        return this.liveViewActive
+        return this.liveViewActive && !!this.helperProcess
     }
 
     // ══════════════════════════════════════════════════════════

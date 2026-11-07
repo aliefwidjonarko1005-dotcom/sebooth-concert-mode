@@ -62,6 +62,7 @@ export class ConfigService {
         landingArt: { enabled: true, style: 'aurora', colors: ['#ff4500', '#fe6b00', '#5b8cff'], opacity: 0.85, liveOpacity: 0.35, speed: 1 },
         buttonRailPositions: [22, 50, 78],
         // Camera Preview Adjustments
+        skipTutorial: false,
         skipViewRequirement: false,
         cameraZoom: 1.0,
         digitalZoom: 1.6, // default view (shared/viewZoom.ts); wide view = 1.0

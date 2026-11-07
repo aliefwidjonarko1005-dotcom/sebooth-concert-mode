@@ -335,15 +335,18 @@ function CaptureSession(): JSX.Element {
                 clearInterval(digicamLiveViewTimer.current)
             }
             // Stop the camera live view to release mirror/resources
-            // BUT: Only stop live view if we are actually navigating away from the capture page,
-            // to prevent mirror drop and COM port resets during component re-renders/HMR.
+            // BUT: Keep live view active when navigating to /photo-review (retake page) or staying on /capture
+            // to avoid the expensive re-initialization + HDMI wait when the user retakes a photo.
             if (config.cameraMode === 'edsdk' || config.cameraMode === 'ptp') {
-                const isStillOnCapture = window.location.pathname === '/capture' || window.location.hash.startsWith('#/capture');
-                if (!isStillOnCapture) {
-                    console.log('[CaptureSession] Navigating away from /capture. Stopping DSLR live view...');
+                const path = window.location.pathname;
+                const hash = window.location.hash;
+                const isStillOnCapture = path === '/capture' || hash.startsWith('#/capture');
+                const isOnPhotoReview = path === '/photo-review' || hash.startsWith('#/photo-review');
+                if (!isStillOnCapture && !isOnPhotoReview) {
+                    console.log('[CaptureSession] Navigating away from capture flow. Stopping DSLR live view...');
                     window.api.camera.stopLiveView().catch(() => {})
                 } else {
-                    console.log('[CaptureSession] Component unmounted/re-rendered on same route. Keeping DSLR live view active.');
+                    console.log('[CaptureSession] Staying in capture flow (capture/photo-review). Keeping DSLR live view active.');
                 }
             }
         }
@@ -363,14 +366,28 @@ function CaptureSession(): JSX.Element {
 
             try {
                 // Step 1: Start DSLR Live View first to establish HDMI signal before opening capture card stream
+                // On retake, live view is usually still active (we don't stop it on navigate to /photo-review)
+                // so we can skip the expensive re-init + HDMI wait entirely.
                 if (isDslr) {
-                    console.log('[CaptureSession] Unified Init: Starting DSLR Live View...');
-                    await window.api.camera.startLiveView();
+                    let liveViewAlreadyActive = false;
+                    try {
+                        const lvStatus = await window.api.camera.isLiveViewActive();
+                        liveViewAlreadyActive = !!(lvStatus.success && lvStatus.data);
+                    } catch {
+                        // Older builds without the IPC: fall through to normal init
+                    }
+
+                    if (liveViewAlreadyActive) {
+                        console.log('[CaptureSession] Unified Init: DSLR Live View already active — skipping re-init (retake fast path)');
+                    } else {
+                        console.log('[CaptureSession] Unified Init: Starting DSLR Live View...');
+                        await window.api.camera.startLiveView();
                     
-                    // Delay to let the HDMI transmitter/capture card hardware stabilize the video signal
-                    if (hasCaptureCard) {
-                        console.log('[CaptureSession] Unified Init: Waiting for HDMI signal stability (2000ms)...');
-                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        // Delay to let the HDMI transmitter/capture card hardware stabilize the video signal
+                        if (hasCaptureCard) {
+                            console.log('[CaptureSession] Unified Init: Waiting for HDMI signal stability (2000ms)...');
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                        }
                     }
                 }
 

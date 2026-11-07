@@ -50,10 +50,10 @@ export function startLocalServer(port = 5050) {
         const exactPath = join(sessionsDir, `Session_${sessionId}`)
         if (existsSync(exactPath)) return exactPath
 
-        // Scan for folder ending with the sessionId
+        // Scan for folder containing the sessionId
         if (existsSync(sessionsDir)) {
             const folders = readdirSync(sessionsDir)
-            const match = folders.find(f => f.startsWith('Session_') && f.endsWith(sessionId))
+            const match = folders.find(f => f.includes(sessionId))
             if (match) return join(sessionsDir, match)
         }
         return null
@@ -77,6 +77,12 @@ export function startLocalServer(port = 5050) {
             const video = files.find(f => f.startsWith('live_video_'))
             const photos = files.filter(f => f.startsWith('photo_'))
 
+            const queryEvent = (req.query.event as string) || ''
+            const queryDate = (req.query.date as string) || ''
+            const queryTime = (req.query.time as string) || ''
+            const eventHeading = queryEvent ? queryEvent : 'Your Memories'
+            const subHeading = [queryDate, queryTime].filter(Boolean).join(' · ')
+
             // Generate beautifully styled mobile-first HTML Gallery
             const html = `
 <!DOCTYPE html>
@@ -84,7 +90,7 @@ export function startLocalServer(port = 5050) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Photobooth Gallery</title>
+    <title>${eventHeading} - Gallery</title>
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
@@ -95,7 +101,8 @@ export function startLocalServer(port = 5050) {
             text-align: center;
         }
         .container { max-width: 500px; margin: 0 auto; }
-        h1 { font-size: 24px; margin-bottom: 24px; font-weight: 700; }
+        h1 { font-size: 24px; margin-bottom: ${subHeading ? '6px' : '24px'}; font-weight: 700; }
+        .sub-header { color: #6b7280; font-size: 14px; margin-bottom: 24px; font-weight: 500; }
         .card { 
             background: white; 
             border-radius: 16px; 
@@ -130,7 +137,8 @@ export function startLocalServer(port = 5050) {
 </head>
 <body>
     <div class="container">
-        <h1>📸 Your Memories</h1>
+        <h1>📸 ${eventHeading}</h1>
+        ${subHeading ? `<div class="sub-header">📅 ${subHeading}</div>` : ''}
         
         ${video ? `
         <div class="card">

@@ -268,7 +268,7 @@ const ReviewSession: React.FC = () => {
                                                         width: '100%',
                                                         height: '100%',
                                                         objectFit: 'cover',
-                                                        transform: `scale(${photo.scale || 1}) scaleX(${isMirrored ? -1 : 1})`,
+                                                        transform: `translate(${isMirrored ? -(photo.panX || 0) : (photo.panX || 0)}px, ${photo.panY || 0}px) scale(${photo.scale || 1}) scaleX(${isMirrored ? -1 : 1})`,
                                                         transformOrigin: 'center center',
                                                         ...filter.style
                                                     }}

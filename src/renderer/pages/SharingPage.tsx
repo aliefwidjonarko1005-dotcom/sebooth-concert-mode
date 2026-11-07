@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import QRCode from 'react-qr-code'
-import { useSessionStore, useAppConfig, useQueueStore } from '../stores'
+import { useSessionStore, useAppConfig, useQueueStore, useEventSessionStore } from '../stores'
 import { PrintQuantityModal } from '../components/PrintQuantityModal'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './SharingPage.module.css'
@@ -14,6 +14,7 @@ function SharingPage(): JSX.Element {
     const { currentSession, endSession } = useSessionStore()
     const { config } = useAppConfig()
     const { activeTicketNumber, activeTicketId, reset: resetQueue } = useQueueStore()
+    const { activeEvent } = useEventSessionStore()
 
     const [qrUrl, setQrUrl] = useState<string | null>(null)
     const [isGenerating, setIsGenerating] = useState(true)
@@ -31,44 +32,15 @@ function SharingPage(): JSX.Element {
     }, [currentSession?.id, currentSession?.cloudSessionId, config.sharingMode, config.cloudPortalUrl, navigate])
 
     const generateQR = async () => {
+        if (!currentSession) return
         setIsGenerating(true)
         setError(null)
         try {
-            // Priority 1: Cloud Mode. The background upload keys the portal by the local session id,
-            // so use the same URL as the QR printed on the strip (cloudSessionId is no longer set).
-            if (config.sharingMode === 'cloud' && currentSession) {
-                const portalUrl = await getQRUrl(config, currentSession.cloudSessionId || currentSession.id)
-                setQrUrl(portalUrl)
-                localStorage.setItem(`gallery_${currentSession.id}`, portalUrl)
-                setIsGenerating(false)
-                return
-            }
-
-            // Priority 2: Local Mode or Cached URLs
-            const cachedUrl = localStorage.getItem(`gallery_${currentSession!.id}`)
-            if (cachedUrl && !cachedUrl.includes('sebooth.app/download')) {
-                setQrUrl(cachedUrl)
-                setIsGenerating(false)
-                return
-            }
-
-            // Priority 3: Fresh Generation
-            if (config.sharingMode === 'local') {
-                const ipRes = await (window as any).api.system.getLocalIp()
-                if (ipRes && ipRes.success && ipRes.data) {
-                    const localIp = ipRes.data
-                    const localUrl = `http://${localIp}:5050/gallery/${currentSession!.id}`
-                    setQrUrl(localUrl)
-                    localStorage.setItem(`gallery_${currentSession!.id}`, localUrl)
-                } else {
-                    throw new Error('Could not determine local IP')
-                }
-            } else {
-                console.warn('Cloud session ID not found in SharingPage, showing fallback')
-                // Final Fallback for Cloud Mode when ID is not yet available
-                const dummyUrl = `https://sebooth.app/download/${currentSession!.id}`
-                setQrUrl(dummyUrl)
-            }
+            const eventName = activeEvent?.eventName || config.eventName || 'Sebooth Event'
+            const createdAt = currentSession.createdAt || Date.now()
+            const portalUrl = await getQRUrl(config, currentSession.cloudSessionId || currentSession.id, { eventName, createdAt })
+            setQrUrl(portalUrl)
+            localStorage.setItem(`gallery_${currentSession.id}`, portalUrl)
         } catch (err) {
             console.error('Failed to generate QR or get URL:', err)
             setError('Gagal membuat QR Code')

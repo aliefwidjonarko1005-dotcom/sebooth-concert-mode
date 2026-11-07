@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useSessionStore, useAppConfig, useQueueStore } from '../stores'
+import { useSessionStore, useAppConfig, useQueueStore, useEventSessionStore } from '../stores'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './PrintingPage.module.css'
 import { SeboothLogo } from '../components/brand/SeboothLogo'
@@ -12,6 +12,7 @@ function PrintingPage(): JSX.Element {
     const { currentSession, endSession, pickupLabel } = useSessionStore()
     const { config } = useAppConfig()
     const { activeTicketNumber, reset: resetQueue } = useQueueStore()
+    const { recordPrint } = useEventSessionStore()
     
     const getHomeRoute = () => (config.queueEnabled && config.queueEventId) ? '/queue' : '/'
     
@@ -150,6 +151,7 @@ function PrintingPage(): JSX.Element {
                     }, 5000)
                 } else {
                     setPrintCompleted(true)
+                    recordPrint(printQuantity)
                     if (result.data?.queued) setPrintDeferred(true)
                     sendSessionCompletedAndGoHome()
                 }
@@ -201,6 +203,7 @@ function PrintingPage(): JSX.Element {
             } else {
                 // Success! Mark as completed and go home
                 setPrintCompleted(true)
+                recordPrint(printQuantity)
                 sendSessionCompletedAndGoHome()
             }
         } catch (err) {

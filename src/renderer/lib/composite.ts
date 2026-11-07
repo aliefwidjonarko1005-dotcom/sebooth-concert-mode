@@ -54,8 +54,27 @@ export const getQRSlots = (frame: any): QRSlot[] => {
     return []
 }
 
-/** URL encoded in the strip QR. Built offline from the session id; the page goes live once uploads finish. */
-export const getQRUrl = async (config: AppConfig, sessionId: string): Promise<string> => {
+/** URL encoded in the strip QR. Built offline from the session id; includes event name and date/time info. */
+export const getQRUrl = async (
+    config: AppConfig,
+    sessionId: string,
+    eventDetails?: { eventName?: string; createdAt?: number | string }
+): Promise<string> => {
+    const rawEventName = eventDetails?.eventName || config.eventName || 'Sebooth'
+    const createdAt = eventDetails?.createdAt ? new Date(eventDetails.createdAt) : new Date()
+
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const dateStr = `${createdAt.getFullYear()}-${pad(createdAt.getMonth() + 1)}-${pad(createdAt.getDate())}`
+    const timeStr = `${pad(createdAt.getHours())}:${pad(createdAt.getMinutes())}:${pad(createdAt.getSeconds())}`
+    const tsCode = `${dateStr}_${pad(createdAt.getHours())}-${pad(createdAt.getMinutes())}-${pad(createdAt.getSeconds())}`
+
+    const queryParams = new URLSearchParams({
+        event: rawEventName,
+        date: dateStr,
+        time: timeStr,
+        ts: tsCode
+    }).toString()
+
     if (config.sharingMode === 'cloud') {
         let portalBase = config.cloudPortalUrl
         if (!portalBase) {
@@ -66,11 +85,11 @@ export const getQRUrl = async (config: AppConfig, sessionId: string): Promise<st
         portalBase = portalBase.replace(/\/$/, '')
         // "sebooth.in" without a scheme makes the QR plain text on many phone scanners
         if (!/^https?:\/\//i.test(portalBase)) portalBase = `https://${portalBase}`
-        return `${portalBase}/access/${sessionId}`
+        return `${portalBase}/access/${sessionId}?${queryParams}`
     }
     const ipRes = await (window as any).api.system.getLocalIp()
     const localIp = (ipRes && ipRes.success && ipRes.data) ? ipRes.data : '127.0.0.1'
-    return `http://${localIp}:5050/gallery/${sessionId}`
+    return `http://${localIp}:5050/gallery/${sessionId}?${queryParams}`
 }
 
 /** Draw photos + frame overlay + QR codes into a JPEG data URL. */
@@ -206,20 +225,31 @@ export const buildGifFrames = async (frame: FrameConfig, photos: CapturedPhoto[]
         const img = await loadImage(photo.imagePath)
         const imgAspect = img.width / img.height
         const canvasAspect = gifCanvas.width / gifCanvas.height
-        let dw = gifCanvas.width, dh = gifCanvas.height, dx = 0, dy = 0
+        let dw = gifCanvas.width, dh = gifCanvas.height
         if (imgAspect > canvasAspect) {
-            dh = gifCanvas.height; dw = gifCanvas.height * imgAspect; dx = (gifCanvas.width - dw) / 2
+            dh = gifCanvas.height; dw = gifCanvas.height * imgAspect
         } else {
-            dw = gifCanvas.width; dh = gifCanvas.width / imgAspect; dy = (gifCanvas.height - dh) / 2
+            dw = gifCanvas.width; dh = gifCanvas.width / imgAspect
         }
+
+        const scale = photo.scale || 1
+        const targetSlot = frame.slots.find(s => s.id === photo.slotId) || firstSlot
+        const gifRatio = targetSlot ? (gifCanvas.width / targetSlot.width) : 1
+        const panX = (photo.panX || 0) * gifRatio
+        const panY = (photo.panY || 0) * gifRatio
+
         gctx.fillStyle = '#ffffff'
         gctx.fillRect(0, 0, gifCanvas.width, gifCanvas.height)
         gctx.save()
+        gctx.translate(gifCanvas.width / 2, gifCanvas.height / 2)
         if (mirror) {
-            gctx.translate(gifCanvas.width, 0)
             gctx.scale(-1, 1)
+            gctx.translate(-panX, panY)
+        } else {
+            gctx.translate(panX, panY)
         }
-        gctx.drawImage(img, dx, dy, dw, dh)
+        gctx.scale(scale, scale)
+        gctx.drawImage(img, -dw / 2, -dh / 2, dw, dh)
         gctx.restore()
         framesBase64.push(gifCanvas.toDataURL('image/jpeg', 0.95))
     }
@@ -235,14 +265,18 @@ export const buildSaveParams = async (params: {
     stripDataUrl?: string
     gifDataUrl?: string
     mirror: boolean
+    eventName?: string
+    createdAt?: number | string
 }) => {
-    const { config, sessionId, frame, photos } = params
-    const qrUrl = await getQRUrl(config, sessionId)
+    const { config, sessionId, frame, photos, eventName, createdAt } = params
+    const qrUrl = await getQRUrl(config, sessionId, { eventName, createdAt })
     const qrSlots = getQRSlots(frame)
     const qrCodeDataUrl = qrUrl && qrSlots.length > 0 ? await QRCode.toDataURL(qrUrl, { margin: 1 }) : undefined
 
     return {
         sessionId,
+        eventName,
+        createdAt,
         stripDataUrl: params.stripDataUrl,
         gifDataUrl: params.gifDataUrl,
         qrCodeDataUrl,

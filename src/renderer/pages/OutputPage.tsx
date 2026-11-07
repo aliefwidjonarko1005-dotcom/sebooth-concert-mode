@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useFrameStore, useSessionStore, useAppConfig } from '../stores'
+import { useEventSessionStore } from '../stores/eventSession'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './OutputPage.module.css'
 import { useEmitOnChange, emitMascot } from '../lib/mascotEvents'
@@ -58,9 +59,11 @@ function OutputPage(): JSX.Element | null {
 
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const uploadLockRef = useRef<string | null>(null)
+    const eventRecordedRef = useRef<string | null>(null)
     const carouselRef = useRef<HTMLDivElement>(null)
     const workspace = useElementSize(carouselRef)
     const workspaceHeight = workspace.height
+    const { recordSession, activeEvent } = useEventSessionStore()
 
     // Generate composite when photos, frame, or filter changes
     useEffect(() => {
@@ -84,6 +87,12 @@ function OutputPage(): JSX.Element | null {
     useEffect(() => {
         if (!isProcessing && compositeDataUrl) {
             handleCloudUpload()
+
+            const sessionId = currentSession?.id
+            if (sessionId && sessionFrame && eventRecordedRef.current !== sessionId) {
+                eventRecordedRef.current = sessionId
+                recordSession(sessionFrame.id, sessionFrame.name || `Frame ${sessionFrame.id}`)
+            }
         }
     }, [isProcessing, compositeDataUrl, config.sharingMode])
 
@@ -91,6 +100,9 @@ function OutputPage(): JSX.Element | null {
         const sessionId = currentSession?.id
         if (!sessionId || !sessionFrame || uploadLockRef.current === sessionId) return
         uploadLockRef.current = sessionId
+
+        const eventName = activeEvent?.eventName || config.eventName || 'Sebooth Event'
+        const createdAt = currentSession?.createdAt || Date.now()
 
         try {
             const save = await buildSaveParams({
@@ -100,12 +112,14 @@ function OutputPage(): JSX.Element | null {
                 photos,
                 stripDataUrl: compositeDataUrl || undefined,
                 gifDataUrl: gifDataUrl || undefined,
-                mirror: isMirrored
+                mirror: isMirrored,
+                eventName,
+                createdAt
             })
             await window.api.system.finalizeSession({
                 save,
                 upload: config.sharingMode === 'cloud'
-                    ? { eventName: config.eventName || 'Sebooth Event', frameName: sessionFrame.name || '-' }
+                    ? { eventName, frameName: sessionFrame.name || '-' }
                     : undefined
             })
             setUploadStatus('Media disimpan & diunggah otomatis di background.')
@@ -140,12 +154,14 @@ function OutputPage(): JSX.Element | null {
     const generateCompositeFromPhotos = async (): Promise<void> => {
         if (!sessionFrame || photos.length === 0 || !canvasRef.current || !currentSession) return
         try {
+            const eventName = activeEvent?.eventName || config.eventName || 'Sebooth Event'
+            const createdAt = currentSession.createdAt || Date.now()
             const dataUrl = await buildComposite({
                 frame: sessionFrame,
                 photos,
                 filter: selectedFilter,
                 mirror: isMirrored,
-                qrUrl: await getQRUrl(config, currentSession.id),
+                qrUrl: await getQRUrl(config, currentSession.id, { eventName, createdAt }),
                 canvas: canvasRef.current
             })
             setCompositeDataUrl(dataUrl)

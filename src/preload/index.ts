@@ -58,6 +58,9 @@ const api = {
         stopLiveView: (): Promise<APIResponse<boolean>> =>
             ipcRenderer.invoke('camera:stop-liveview'),
 
+        isLiveViewActive: (): Promise<APIResponse<boolean>> =>
+            ipcRenderer.invoke('camera:is-liveview-active'),
+
         getLiveViewUrl: (): Promise<APIResponse<string>> =>
             ipcRenderer.invoke('camera:get-liveview-url'),
 

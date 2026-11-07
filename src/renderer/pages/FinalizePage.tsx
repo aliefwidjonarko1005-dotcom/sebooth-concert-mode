@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { useSessionStore, useFrameStore, useAppConfig } from '../stores'
+import { useSessionStore, useFrameStore, useAppConfig, useEventSessionStore } from '../stores'
 import { SessionTimer } from '../components/SessionTimer'
 import { buildComposite, buildGifFrames, buildSaveParams, getQRUrl } from '../lib/composite'
 import styles from './FinalizePage.module.css'
@@ -19,6 +19,7 @@ function FinalizePage(): JSX.Element | null {
     const { currentSession, photos, isMirrored, setIsMirrored, setCompositePath, setPickupLabel, endSession } = useSessionStore()
     const { frames } = useFrameStore()
     const { config, updateConfig } = useAppConfig()
+    const { activeEvent } = useEventSessionStore()
 
     const [preview, setPreview] = useState<string | null>(null)
     const printStarted = useRef(false)
@@ -60,12 +61,14 @@ function FinalizePage(): JSX.Element | null {
         setPreview(null)
         ;(async () => {
             try {
+                const eventName = activeEvent?.eventName || config.eventName || 'Sebooth Event'
+                const createdAt = currentSession.createdAt || Date.now()
                 const dataUrl = await buildComposite({
                     frame,
                     photos: sessionPhotos,
                     filter: 'none',
                     mirror: isMirrored,
-                    qrUrl: await getQRUrl(config, currentSession.id)
+                    qrUrl: await getQRUrl(config, currentSession.id, { eventName, createdAt })
                 })
                 if (cancelled) return
                 setPreview(dataUrl)
@@ -75,7 +78,7 @@ function FinalizePage(): JSX.Element | null {
             }
         })()
         return () => { cancelled = true }
-    }, [isMirrored, frame, sessionPhotos, currentSession?.id])
+    }, [isMirrored, frame, sessionPhotos, currentSession?.id, activeEvent, config])
 
     const handlePrint = useCallback(() => {
         if (printStarted.current || !preview || !currentSession || !frame) return
@@ -90,15 +93,27 @@ function FinalizePage(): JSX.Element | null {
         const sessionId = currentSession.id
         const mirror = isMirrored
         const strip = preview
+        const eventName = activeEvent?.eventName || config.eventName || 'Sebooth Event'
+        const createdAt = currentSession.createdAt || Date.now()
+
         ;(async () => {
             try {
                 const gifFrames = await buildGifFrames(frame, photos, mirror)
-                const save = await buildSaveParams({ config, sessionId, frame, photos: sessionPhotos, stripDataUrl: strip, mirror })
+                const save = await buildSaveParams({
+                    config,
+                    sessionId,
+                    frame,
+                    photos: sessionPhotos,
+                    stripDataUrl: strip,
+                    mirror,
+                    eventName,
+                    createdAt
+                })
                 await window.api.system.finalizeSession({
                     save,
                     gifFrames,
                     upload: config.sharingMode === 'cloud'
-                        ? { eventName: config.eventName || 'Sebooth Event', frameName: frame.name || '-' }
+                        ? { eventName, frameName: frame.name || '-' }
                         : undefined
                 })
             } catch (err) {
@@ -107,7 +122,7 @@ function FinalizePage(): JSX.Element | null {
         })()
 
         navigate('/printing', { state: { printQuantity: config.concertPrintQuantity || 2 } })
-    }, [preview, currentSession, frame, photos, sessionPhotos, isMirrored, config, updateConfig, setPickupLabel, navigate])
+    }, [preview, currentSession, frame, photos, sessionPhotos, isMirrored, config, activeEvent, updateConfig, setPickupLabel, navigate])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {

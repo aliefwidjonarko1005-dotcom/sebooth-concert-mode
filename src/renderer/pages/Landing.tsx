@@ -202,13 +202,13 @@ function Landing(): JSX.Element {
             } else if (frames.length > 0) {
                 setActiveFrame(frames[0].id)
             }
-            navigate(startRoute(config.concertMode))
+            navigate(startRoute(config.concertMode, config.skipTutorial))
         } catch (error) {
             console.error('Failed to start session:', error)
         } finally {
             setIsLoading(false)
         }
-    }, [isConnected, selectedCamera, setConnected, config.activeFrameId, config.concertMode, setActiveFrame, frames, navigate])
+    }, [isConnected, selectedCamera, setConnected, config.activeFrameId, config.concertMode, config.skipTutorial, setActiveFrame, frames, navigate])
 
     // Default view (160%) <-> wide view (100%) from the homepage: button 2 or the navbar pill; same crop as photo + clip
     const wideView = isWideView(config.digitalZoom)

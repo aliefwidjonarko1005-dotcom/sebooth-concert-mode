@@ -261,6 +261,7 @@ export interface AppConfig {
 
 
     // Physical Button Indicator Settings (Global & Per-Page Overrides)
+    skipTutorial?: boolean // Skip tutorial page and navigate directly to frames
     skipViewRequirement?: boolean // Skip mandatory 1-by-1 result viewing requirement on Output Page
     buttonIndicatorEnabled?: boolean
     buttonIndicatorText?: string

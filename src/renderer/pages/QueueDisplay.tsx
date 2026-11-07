@@ -244,7 +244,7 @@ function QueueDisplay(): JSX.Element {
         const frameId = config.activeFrameId || (config.activeFrameIds?.[0]) || (frames.length > 0 ? frames[0].id : '')
         if (frameId) setActiveFrame(frameId)
         startSession(frameId)
-        navigate(startRoute(config.concertMode))
+        navigate(startRoute(config.concertMode, config.skipTutorial))
     }
 
     // ── Determine display state ──

@@ -98,6 +98,8 @@ const defaultConfig: AppConfig = {
     cameraScaleY: 1.0,
     cameraOffsetX: 0,
     cameraOffsetY: 0,
+    skipTutorial: false,
+    skipViewRequirement: false,
     // Physical Button Indicator Settings
     buttonIndicatorEnabled: false,
     buttonIndicatorText: 'TEKAN TOMBOL DI SINI ➔',
@@ -658,3 +660,5 @@ export const useQueueStore = create<QueueState>((set) => ({
         activeTicketId: null
     })
 }))
+
+export * from './eventSession'

@@ -502,10 +502,16 @@
                 `;
             }
 
+            const eventParam = params.get('event');
+            const timeParam = params.get('time');
+            const dateParam = params.get('date');
+            const headerTitle = eventParam ? `📸 ${eventParam}` : '📸 Your Photos';
+            const headerSubtitle = (dateParam || dateStr) + (timeParam ? ` · ${timeParam}` : '');
+
             document.getElementById('app').innerHTML = `
                 <header class="header">
-                    <h1>📸 Your Photos</h1>
-                    <p>${dateStr}</p>
+                    <h1>${headerTitle}</h1>
+                    <p>${headerSubtitle}</p>
                 </header>
                 <nav class="tabs">${tabsHtml}</nav>
                 <main class="content">${sectionsHtml}</main>
