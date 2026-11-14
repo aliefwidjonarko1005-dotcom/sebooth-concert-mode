@@ -8,6 +8,12 @@ import { printerHandler } from './handlers/PrinterHandler'
 import { configService } from './services/ConfigService'
 import { printQueueService } from './services/PrintQueueService'
 import sharp from 'sharp'
+import { getLanKey, sameKey } from './lib/lanKey'
+import { isGuardLocked } from './guard/runtime'
+
+// Never sent over HTTP; a value equal to SECRET_MASK in a POST means "unchanged".
+const SECRET_FIELDS = ['midtransServerKey', 'dokuSecretKey', 'queueWebhookSecret', 'adminPinHash'] as const
+const SECRET_MASK = '••••••••'
 
 let serverInstance: any = null
 
@@ -15,8 +21,41 @@ export function startLocalServer(port = 5050) {
     if (serverInstance) return
 
     const server = express()
-    server.use(cors())
+    // Booth Guard lockdown covers the LAN server too: nothing is served while the booth is locked.
+    server.use((_req, res, next) => {
+        if (isGuardLocked()) return res.status(503).json({ success: false, error: 'LOCKED' })
+        next()
+    })
+
+    // Remote browsers load the UI from this same origin; only the dev renderer is cross-origin.
+    server.use(cors({ origin: ['http://localhost:5173'] }))
     server.use(express.json({ limit: '50mb' })) // Increased limit for base64 image payloads from remote devices
+
+    // LAN key gate: config, sessions, print admin, live view and /monitor need the key (or a loopback
+    // caller with no foreign Origin, i.e. the kiosk window). Booth-to-booth print endpoints stay open.
+    const lanKeyReady = getLanKey()
+    const LAN_OPEN = new Set(['/api/remote-print', '/api/remote-print/status', '/api/print/heartbeat'])
+    server.use(async (req, res, next) => {
+        const key = await lanKeyReady
+        const fromQuery = typeof req.query.k === 'string' ? req.query.k : ''
+        if (fromQuery && sameKey(fromQuery, key)) {
+            res.setHeader('Set-Cookie', `sbk=${key}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`)
+        }
+        const guarded = req.path === '/monitor' || (req.path.startsWith('/api/') && !LAN_OPEN.has(req.path))
+        if (!guarded) return next()
+
+        const cookieKey = /(?:^|;\s*)sbk=([0-9a-f]{32})/.exec(req.headers.cookie || '')?.[1] || ''
+        const given = fromQuery || req.get('x-sebooth-key') || cookieKey
+        if (given && sameKey(given, key)) return next()
+
+        const addr = req.socket.remoteAddress || ''
+        const loopback = addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1'
+        const origin = req.get('origin')
+        const trustedOrigin = !origin || origin === 'null' || origin.startsWith('file://') || /^http:\/\/localhost:\d+$/.test(origin)
+        if (loopback && trustedOrigin) return next()
+
+        res.status(401).json({ success: false, error: 'LAN key required. Open the link shown in Admin on this device.' })
+    })
 
     const documentsPath = app.getPath('documents')
     const sessionsDir = join(documentsPath, 'Sebooth', 'Sessions')
@@ -248,14 +287,22 @@ export function startLocalServer(port = 5050) {
     })
 
     // 1b. Config APIs (Phase 1 Remote Control)
+    const redact = (cfg: any) => {
+        const out = { ...cfg }
+        for (const f of SECRET_FIELDS) if (out[f]) out[f] = SECRET_MASK
+        return out
+    }
+
     server.get('/api/config', (req, res) => {
-        res.json(configService.getConfig())
+        res.json(redact(configService.getConfig()))
     })
 
     server.post('/api/config', (req, res) => {
         try {
-            const newConfig = configService.updateConfig(req.body)
-            res.json({ success: true, config: newConfig })
+            const updates = { ...(req.body || {}) }
+            for (const f of SECRET_FIELDS) if (updates[f] === SECRET_MASK) delete updates[f]
+            const newConfig = configService.updateConfig(updates)
+            res.json({ success: true, config: redact(newConfig) })
         } catch (e) {
             res.status(500).json({ error: 'Failed to update config' })
         }
@@ -264,7 +311,12 @@ export function startLocalServer(port = 5050) {
     // Save frame overlay from remote admin browser
     server.post('/api/frames/overlay', (req, res) => {
         try {
-            const { dataUrl, filename } = req.body
+            const { dataUrl } = req.body
+            // basename + extension whitelist: a "../" filename used to write anywhere on disk
+            const filename = basename(String(req.body?.filename || ''))
+            if (!/^[\w .()-]+\.(png|jpe?g|webp)$/i.test(filename)) {
+                return res.status(400).json({ success: false, error: 'Invalid filename' })
+            }
             const targetFramesDir = join(app.getPath('userData'), 'frames')
             if (!existsSync(targetFramesDir)) mkdirSync(targetFramesDir, { recursive: true })
             const matches = dataUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/)

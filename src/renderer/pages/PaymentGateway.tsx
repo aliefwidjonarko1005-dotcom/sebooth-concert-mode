@@ -70,29 +70,28 @@ function PaymentGateway(): JSX.Element {
         return `${m}:${s}`
     }
 
+    // Flipbook package replaces the strip session (no additional prints)
+    const [flipbookChosen, setFlipbookChosen] = useState(false)
+    const isFlipbook = !!config.flipbookEnabled && flipbookChosen
+
     // Calculate total price
-    const totalPrice = config.sessionPrice + (additionalPrints * config.additionalPrintPrice)
+    const totalPrice = isFlipbook
+        ? (config.flipbookPrice ?? 50000)
+        : config.sessionPrice + (additionalPrints * config.additionalPrintPrice)
 
     // Handle print quantity change (multiples of 2)
     const handlePrintChange = (delta: number): void => {
         setAdditionalPrints(prev => Math.max(0, prev + delta))
     }
 
+    const startPaidSession = (): void => {
+        if (activeFrame) startSession(activeFrame.id, 2 + (isFlipbook ? 0 : additionalPrints), isFlipbook)
+    }
+
     // Create QRIS order
     const createOrder = async (): Promise<void> => {
         const isDoku = config.paymentGateway === 'doku'
-
-        if (isDoku) {
-            if (!config.dokuClientId || !config.dokuSecretKey) {
-                alert('DOKU Client ID atau Secret Key belum dikonfigurasi di Admin Panel')
-                return
-            }
-        } else {
-            if (!config.midtransServerKey) {
-                alert('Midtrans Server Key belum dikonfigurasi di Admin Panel')
-                return
-            }
-        }
+        // Gateway keys are checked in main (or held by the server with Booth Guard); errors surface below
 
         setIsCreatingOrder(true)
         const orderId = `SEBOOTH-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
@@ -119,28 +118,10 @@ function PaymentGateway(): JSX.Element {
                     throw new Error(res.error || 'Gagal membuat sesi pembayaran DOKU')
                 }
             } else {
-                // Create Midtrans transaction
-                const auth = btoa(`${config.midtransServerKey}:`)
-                const response = await fetch('https://api.sandbox.midtrans.com/v2/charge', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Basic ${auth}`,
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        payment_type: 'qris',
-                        transaction_details: {
-                            order_id: orderId,
-                            gross_amount: totalPrice
-                        },
-                        qris: {
-                            acquirer: 'gopay'
-                        }
-                    })
-                })
-
-                const data = await response.json()
+                // Create Midtrans transaction (main process holds the server key)
+                const res = await (window as any).api.payment.midtransCharge({ orderId, amount: totalPrice })
+                if (!res.success) throw new Error(res.error || 'Gagal membuat transaksi Midtrans')
+                const data = res.data
 
                 if (data.actions && data.actions[0]) {
                     const qrisAction = data.actions.find((a: { name: string }) => a.name === 'generate-qr-code')
@@ -199,10 +180,7 @@ function PaymentGateway(): JSX.Element {
 
                             // Start session and navigate to capture with paid print quantity
                             setTimeout(() => {
-                                if (activeFrame) {
-                                    const paidQuantity = 2 + additionalPrints
-                                    startSession(activeFrame.id, paidQuantity)
-                                }
+                                startPaidSession()
                                 navigate('/capture')
                             }, 2000)
                         } else if (status === 'FAILED') {
@@ -212,17 +190,9 @@ function PaymentGateway(): JSX.Element {
                         }
                     }
                 } else {
-                    const auth = btoa(`${config.midtransServerKey}:`)
-                    const response = await fetch(
-                        `https://api.sandbox.midtrans.com/v2/${orderId}/status`,
-                        {
-                            headers: {
-                                'Authorization': `Basic ${auth}`,
-                                'Accept': 'application/json'
-                            }
-                        }
-                    )
-                    const data = await response.json()
+                    const res = await (window as any).api.payment.midtransStatus({ orderId })
+                    if (!res.success) throw new Error(res.error)
+                    const data = res.data
 
                     if (data.transaction_status === 'settlement' || data.transaction_status === 'capture') {
                         clearInterval(interval)
@@ -231,10 +201,7 @@ function PaymentGateway(): JSX.Element {
 
                         // Start session and navigate to capture with paid print quantity
                         setTimeout(() => {
-                            if (activeFrame) {
-                                const paidQuantity = 2 + additionalPrints
-                                startSession(activeFrame.id, paidQuantity)
-                            }
+                            startPaidSession()
                             navigate('/capture')
                         }, 2000)
                     } else if (data.transaction_status === 'expire' || data.transaction_status === 'cancel') {
@@ -281,10 +248,7 @@ function PaymentGateway(): JSX.Element {
 
     // Handle skip (for testing)
     const handleSkip = (): void => {
-        if (activeFrame) {
-            const paidQuantity = 2 + additionalPrints
-            startSession(activeFrame.id, paidQuantity)
-        }
+        startPaidSession()
         navigate('/capture')
     }
 
@@ -296,12 +260,15 @@ function PaymentGateway(): JSX.Element {
 
             if (e.key === '1') {
                 e.preventDefault()
-                if (additionalPrints > 0) {
-                    handlePrintChange(-2)
-                }
+                if (payment.status !== 'idle') return
+                // With the flipbook package on, button 1 switches package; 2 cycles extra prints (0→6→0)
+                if (config.flipbookEnabled) setFlipbookChosen(v => !v)
+                else if (additionalPrints > 0) handlePrintChange(-2)
             } else if (e.key === '2') {
                 e.preventDefault()
-                handlePrintChange(2)
+                if (payment.status !== 'idle' || isFlipbook) return
+                if (config.flipbookEnabled && additionalPrints >= 6) setAdditionalPrints(0)
+                else handlePrintChange(2)
             } else if (e.key === '3') {
                 e.preventDefault()
                 if (payment.status === 'idle') {
@@ -313,13 +280,15 @@ function PaymentGateway(): JSX.Element {
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [additionalPrints, payment.status, createOrder])
+    }, [additionalPrints, payment.status, createOrder, config.flipbookEnabled, isFlipbook])
 
     // Rail labels for the physical buttons (the handler above already maps 1/2/3); touch has its own buttons
     useButtonHints(
         payment.status === 'idle' ? {
-            1: additionalPrints > 0 ? { label: 'Kurangi cetak', onScreen: true } : null,
-            2: { label: 'Tambah cetak', onScreen: true },
+            1: config.flipbookEnabled
+                ? { label: isFlipbook ? 'Paket strip' : 'Paket flipbook', onScreen: true }
+                : additionalPrints > 0 ? { label: 'Kurangi cetak', onScreen: true } : null,
+            2: isFlipbook ? null : { label: 'Tambah cetak', onScreen: true },
             3: { label: 'Bayar', primary: true, onScreen: true }
         } : payment.status === 'expired' || payment.status === 'failed' ? {
             3: { label: 'Coba lagi', primary: true, onScreen: true }
@@ -365,13 +334,26 @@ function PaymentGateway(): JSX.Element {
                     <div className={`${styles.priceSection} ${payment.status === 'pending' || isCreatingOrder ? styles.hiddenOnQr : ''}`}>
                         <div className={styles.orderSummaryHeader}>
                             <h2>Ringkasan pesanan</h2>
-                            <div className={styles.priceItem}>
-                                <span>Sesi foto (1 cetak 4R)</span>
-                                <span>Rp {config.sessionPrice.toLocaleString('id-ID')}</span>
-                            </div>
+                            {config.flipbookEnabled && (
+                                <div className={styles.packageSwitch}>
+                                    <button className={!isFlipbook ? styles.packageActive : ''} onClick={() => setFlipbookChosen(false)}>Strip foto</button>
+                                    <button className={isFlipbook ? styles.packageActive : ''} onClick={() => setFlipbookChosen(true)}>Flipbook</button>
+                                </div>
+                            )}
+                            {isFlipbook ? (
+                                <div className={styles.priceItem}>
+                                    <span>Flipbook ({(config.flipbookSheets ?? 6) * 4} halaman)</span>
+                                    <span>Rp {(config.flipbookPrice ?? 50000).toLocaleString('id-ID')}</span>
+                                </div>
+                            ) : (
+                                <div className={styles.priceItem}>
+                                    <span>Sesi foto (1 cetak 4R)</span>
+                                    <span>Rp {config.sessionPrice.toLocaleString('id-ID')}</span>
+                                </div>
+                            )}
                         </div>
 
-                        <div className={styles.additionalPrintSection}>
+                        {!isFlipbook && <div className={styles.additionalPrintSection}>
                             <div className={styles.printSelector}>
                                 <span className={styles.printSelectorTitle}>Cetak tambahan (per 2 lembar)</span>
                                 <div className={styles.quantityControls}>
@@ -392,7 +374,7 @@ function PaymentGateway(): JSX.Element {
                                     <span>Rp {(additionalPrints * config.additionalPrintPrice).toLocaleString('id-ID')}</span>
                                 </div>
                             )}
-                        </div>
+                        </div>}
 
                         <div className={styles.orderSummaryFooter}>
                             <div className={styles.priceDivider}></div>

@@ -2,6 +2,8 @@ import { IpcMain, app } from 'electron'
 import nodemailer from 'nodemailer'
 import { join } from 'path'
 import { existsSync, readdirSync } from 'fs'
+import { GUARD_ENABLED } from '@shared/guardPins'
+import { guardRequest } from '../guard/client'
 
 // dotenv is loaded centrally in lib/env.ts (imported first by index.ts)
 
@@ -18,6 +20,16 @@ interface SendEmailParams {
 
 export function registerEmailHandlers(ipcMain: IpcMain): void {
     ipcMain.handle('email:send', async (_event, params: SendEmailParams) => {
+        // Booth Guard: the website sends it (gallery link + strip); the Gmail password stays off the booth
+        if (GUARD_ENABLED) {
+            const r = await guardRequest('/api/booth/email', {
+                to: params.to,
+                sessionId: params.sessionId,
+                galleryUrl: params.galleryUrl,
+                photoStripUrl: params.photoStripUrl
+            })
+            return r ?? { success: false, error: 'Server email tidak terjangkau. Cek koneksi internet.' }
+        }
         if (!GMAIL_USER || !GMAIL_APP_PASSWORD || GMAIL_APP_PASSWORD === 'YOUR_GMAIL_APP_PASSWORD_HERE') {
             return {
                 success: false,
@@ -153,6 +165,6 @@ export function registerEmailHandlers(ipcMain: IpcMain): void {
 
     // Check if email is configured
     ipcMain.handle('email:is-configured', () => {
-        return Boolean(GMAIL_USER && GMAIL_APP_PASSWORD && GMAIL_APP_PASSWORD !== 'YOUR_GMAIL_APP_PASSWORD_HERE')
+        return GUARD_ENABLED || Boolean(GMAIL_USER && GMAIL_APP_PASSWORD && GMAIL_APP_PASSWORD !== 'YOUR_GMAIL_APP_PASSWORD_HERE')
     })
 }

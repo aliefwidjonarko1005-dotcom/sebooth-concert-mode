@@ -12,6 +12,16 @@ import {
 
 // Custom APIs for renderer
 const api = {
+    // Booth Guard: lock state of this install (see src/main/guard/client.ts)
+    guard: {
+        getState: (): Promise<APIResponse<any>> => ipcRenderer.invoke('guard:get-state'),
+        onState: (callback: (view: any) => void): (() => void) => {
+            const subscription = (_: any, view: any) => callback(view)
+            ipcRenderer.on('guard:state', subscription)
+            return () => { ipcRenderer.removeListener('guard:state', subscription) }
+        }
+    },
+
     // Camera APIs
     camera: {
         list: (): Promise<APIResponse<CameraDevice[]>> =>
@@ -25,6 +35,9 @@ const api = {
 
         capture: (slotId?: string, options?: any): Promise<APIResponse<CaptureResult>> =>
             ipcRenderer.invoke('camera:capture', slotId, options),
+
+        burst: (durationMs: number): Promise<APIResponse<string[]>> =>
+            ipcRenderer.invoke('camera:burst', durationMs),
 
         status: (): Promise<APIResponse<{ connected: boolean; camera: CameraDevice | null }>> =>
             ipcRenderer.invoke('camera:status'),
@@ -125,6 +138,12 @@ const api = {
 
         getLocalIp: (): Promise<APIResponse<string | null>> =>
             ipcRenderer.invoke('system:get-local-ip'),
+
+        getLanKey: (): Promise<APIResponse<string>> =>
+            ipcRenderer.invoke('system:get-lan-key'),
+
+        verifyAdminPin: (pin: string): Promise<APIResponse<{ ok: boolean; retryInSec?: number }>> =>
+            ipcRenderer.invoke('system:verify-admin-pin', pin),
 
         getUserDataPath: (): Promise<APIResponse<string>> =>
             ipcRenderer.invoke('system:get-user-data-path'),
@@ -228,6 +247,14 @@ const api = {
             height?: number
         }): Promise<APIResponse<string>> =>
             ipcRenderer.invoke('image:generate-gif', options),
+
+        flipbookSheets: (options: {
+            photoPaths: string[]
+            coverPath?: string
+            sheets: number
+            outDir: string
+        }): Promise<APIResponse<{ sheets: string[]; previews: string[] }>> =>
+            ipcRenderer.invoke('image:flipbook-sheets', options),
 
         metadata: (imagePath: string): Promise<APIResponse<{
             width: number
@@ -349,6 +376,12 @@ const api = {
 
     // Payment APIs (Doku Integration)
     payment: {
+        // Raw Midtrans JSON, fetched by main (the server key never reaches the renderer)
+        midtransCharge: (params: { orderId: string; amount: number }): Promise<APIResponse<any>> =>
+            ipcRenderer.invoke('payment:midtrans-charge', params),
+        midtransStatus: (params: { orderId: string }): Promise<APIResponse<any>> =>
+            ipcRenderer.invoke('payment:midtrans-status', params),
+
         dokuCreateSession: (params: { orderId: string; amount: number }): Promise<APIResponse<{ 
             paymentUrl: string; 
             invoiceNumber: string;

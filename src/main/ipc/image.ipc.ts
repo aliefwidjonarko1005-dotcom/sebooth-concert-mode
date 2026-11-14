@@ -1,5 +1,6 @@
 import { IpcMain } from 'electron'
 import { ImageProcessor } from '../services/ImageProcessor'
+import { buildFlipbookSheets } from '../services/FlipbookSheets'
 import { PhotoSlot, APIResponse } from '@shared/types'
 
 const imageProcessor = new ImageProcessor()
@@ -97,6 +98,21 @@ export function registerImageHandlers(ipcMain: IpcMain): void {
                 options.height
             )
             return { success: true, data: result }
+        } catch (error) {
+            const err = error as Error
+            return { success: false, error: err.message }
+        }
+    })
+
+    // Flipbook: burst frames → 4R sheets (4 pages each) in print order
+    ipcMain.handle('image:flipbook-sheets', async (_, options: {
+        photoPaths: string[]
+        coverPath?: string
+        sheets: number
+        outDir: string
+    }): Promise<APIResponse<{ sheets: string[]; previews: string[] }>> => {
+        try {
+            return { success: true, data: await buildFlipbookSheets(options) }
         } catch (error) {
             const err = error as Error
             return { success: false, error: err.message }

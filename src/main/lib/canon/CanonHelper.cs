@@ -186,6 +186,18 @@ namespace CanonHelper
                 {
                     HandleRecFetch(line.Substring(10).Trim());
                 }
+                else if (line.StartsWith("SET_ASPECT ", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleSetAspect(line.Substring(11).Trim());
+                }
+                else if (line.StartsWith("SET_PROP ", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleSetProp(line.Substring(9).Trim());
+                }
+                else if (line.StartsWith("BURST ", StringComparison.OrdinalIgnoreCase))
+                {
+                    HandleBurst(line.Substring(6).Trim());
+                }
             }
             catch (Exception ex)
             {
@@ -203,6 +215,54 @@ namespace CanonHelper
             {
                 Console.WriteLine("WARNING:KEEPALIVE err=0x" + err.ToString("X"));
             }
+        }
+
+        // kEdsPropID_Aspect (0x01000431): 0 = full frame, 13 = 1.6x crop. Used for the Landing zoom buttons.
+        private static void HandleSetAspect(string arg)
+        {
+            int value;
+            if (_camera == null || !int.TryParse(arg, out value)) return;
+            try
+            {
+                _camera.SetProperty(0x01000431, value);
+                Console.WriteLine("STATUS:ASPECT_OK:" + value);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("WARNING:SET_ASPECT failed - " + ex.Message);
+            }
+        }
+
+        // "SET_PROP <iso|tv> <edsdk code>" through this session (a second EDSDK session would lock the camera).
+        // Reports with WARNING, not ERROR: a capture waiting on stdout must not read this as its own failure.
+        // Tv only works in M/Tv on the dial; the body can also be briefly busy, hence the retries.
+        private static void HandleSetProp(string arg)
+        {
+            string[] parts = arg.Split(' ');
+            int value;
+            if (_camera == null || parts.Length != 2 || !int.TryParse(parts[1], out value)) return;
+            uint prop;
+            if (parts[0].Equals("iso", StringComparison.OrdinalIgnoreCase)) prop = kEdsPropID_ISOSpeed;
+            else if (parts[0].Equals("tv", StringComparison.OrdinalIgnoreCase)) prop = kEdsPropID_Tv;
+            else return;
+
+            string lastError = "";
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                try
+                {
+                    lock (_cameraLock) { _camera.SetProperty(prop, value); }
+                    Console.WriteLine("STATUS:PROP_OK:" + parts[0]);
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex.Message.Replace("\r", " ").Replace("\n", " ");
+                    EdsGetEvent_Pin();
+                    Thread.Sleep(300);
+                }
+            }
+            Console.WriteLine("WARNING:PROP_FAIL:" + parts[0] + ":" + lastError);
         }
 
         private static void LiveViewTimer_Tick(object sender, EventArgs e)
@@ -383,42 +443,169 @@ namespace CanonHelper
             }
         }
 
-        private static void HandleCapture(string outputPath)
+        // Stops live view for a shot; returns whether it was running (pass to ResumeLiveView).
+        private static bool SuspendLiveView()
         {
             bool wasLiveViewRunning = false;
             lock (_cameraLock)
             {
                 wasLiveViewRunning = _liveViewRunning;
             }
+            if (!wasLiveViewRunning) return false;
+
+            lock (_cameraLock)
+            {
+                _liveViewRunning = false;
+                if (_liveViewTimer != null)
+                {
+                    _liveViewTimer.Stop();
+                }
+            }
+
+            Thread.Sleep(100);
+
+            lock (_cameraLock)
+            {
+                try
+                {
+                    _camera.StopLiveView();
+                }
+                catch {}
+            }
+
+            // Settle time for cermin DSLR turun
+            Thread.Sleep(600);
+            return true;
+        }
+
+        private static void ResumeLiveView(bool wasLiveViewRunning)
+        {
+            if (!wasLiveViewRunning) return;
+            Thread.Sleep(300);
+            if (_liveViewTftMode)
+            {
+                HandleStartLiveViewTft();
+            }
+            else
+            {
+                HandleStartLiveView();
+            }
+        }
+
+        // Flipbook: "BURST <ms> <outDir>". Holds the shutter for <ms> in continuous drive, waits for the
+        // camera to finish writing, then downloads every new JPG in shot order as burst-000.jpg...
+        // Bodies that refuse the DriveMode write keep their dial setting (set it to continuous by hand).
+        private static void HandleBurst(string arg)
+        {
+            string[] parts = arg.Split(new[] { ' ' }, 2);
+            int ms;
+            if (parts.Length < 2 || !int.TryParse(parts[0], out ms) || ms <= 0)
+            {
+                Console.WriteLine("ERROR:BURST usage: BURST <ms> <outDir>");
+                return;
+            }
+            string outDir = parts[1].Trim();
+
+            bool wasLiveViewRunning = false;
+            bool driveSet = false;
+            try
+            {
+                Directory.CreateDirectory(outDir);
+                wasLiveViewRunning = SuspendLiveView();
+
+                lock (_cameraLock)
+                {
+                    var knownFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    CollectFiles(_cameraRef, "", knownFiles, null);
+
+                    try { _camera.SetProperty(kEdsPropID_DriveMode, 4); driveSet = true; Console.WriteLine("STATUS:BURST_DRIVE:high"); }
+                    catch
+                    {
+                        try { _camera.SetProperty(kEdsPropID_DriveMode, 1); driveSet = true; Console.WriteLine("STATUS:BURST_DRIVE:normal"); }
+                        catch (Exception ex) { Console.WriteLine("WARNING:BURST DriveMode not settable - " + ex.Message); }
+                    }
+
+                    uint err = EdsSendCommand_Pin(_cameraRef, kEdsCameraCommand_PressShutterButton, kEdsShutterButton_CompletelyNonAF);
+                    try
+                    {
+                        if (err != 0)
+                        {
+                            Console.WriteLine("ERROR:BURST shutter press failed (0x" + err.ToString("X") + ")");
+                            return;
+                        }
+                        var held = System.Diagnostics.Stopwatch.StartNew();
+                        while (held.ElapsedMilliseconds < ms)
+                        {
+                            EdsGetEvent_Pin();
+                            Thread.Sleep(50);
+                        }
+                    }
+                    finally
+                    {
+                        EdsSendCommand_Pin(_cameraRef, kEdsCameraCommand_PressShutterButton, kEdsShutterButton_Off);
+                    }
+
+                    // Wait until the buffer is flushed to the card: new-file count stable for 1.5 s (max 30 s)
+                    var newFiles = new List<NewFile>();
+                    int lastCount = -1;
+                    var stable = System.Diagnostics.Stopwatch.StartNew();
+                    var total = System.Diagnostics.Stopwatch.StartNew();
+                    while (total.ElapsedMilliseconds < 30000)
+                    {
+                        EdsGetEvent_Pin();
+                        Thread.Sleep(300);
+                        var all = new List<NewFile>();
+                        CollectFiles(_cameraRef, "", null, all);
+                        newFiles = all.FindAll(f => !knownFiles.Contains(f.Key));
+                        if (newFiles.Count != lastCount) { lastCount = newFiles.Count; stable.Restart(); }
+                        else if (lastCount > 0 && stable.ElapsedMilliseconds >= 1500) break;
+                    }
+
+                    var jpgs = newFiles.FindAll(f => f.Name.EndsWith(".JPG", StringComparison.OrdinalIgnoreCase));
+                    jpgs.Sort((a, b) => string.Compare(a.Key, b.Key, StringComparison.OrdinalIgnoreCase));
+                    if (jpgs.Count == 0)
+                    {
+                        Console.WriteLine("ERROR:BURST no JPG written (RAW-only or shutter blocked?)");
+                        return;
+                    }
+
+                    int saved = 0;
+                    foreach (var f in jpgs)
+                    {
+                        string dest = Path.Combine(outDir, "burst-" + saved.ToString("D3") + ".jpg");
+                        uint dl = DownloadFile(f.Ref, f.Size, dest);
+                        if (dl == 0) saved++;
+                        else Console.WriteLine("WARNING:BURST download failed for " + f.Name + " (0x" + dl.ToString("X") + ")");
+                    }
+                    // Keep the card clean like CAPTURE does (RAW siblings included)
+                    foreach (var f in newFiles) EdsDeleteDirectoryItem(f.Ref);
+
+                    if (saved == 0) Console.WriteLine("ERROR:BURST download failed");
+                    else Console.WriteLine("BURST_DONE:" + saved);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("ERROR:BURST exception - " + ex.Message);
+            }
+            finally
+            {
+                if (driveSet)
+                {
+                    try { lock (_cameraLock) { _camera.SetProperty(kEdsPropID_DriveMode, 0); } } catch { }
+                }
+                ResumeLiveView(wasLiveViewRunning);
+            }
+        }
+
+        private static void HandleCapture(string outputPath)
+        {
+            bool wasLiveViewRunning = false;
 
             try
             {
                 // 1. Suspend live view if running
-                if (wasLiveViewRunning)
-                {
-                    lock (_cameraLock)
-                    {
-                        _liveViewRunning = false;
-                        if (_liveViewTimer != null)
-                        {
-                            _liveViewTimer.Stop();
-                        }
-                    }
-                    
-                    Thread.Sleep(100);
-
-                    lock (_cameraLock)
-                    {
-                        try
-                        {
-                            _camera.StopLiveView();
-                        }
-                        catch {}
-                    }
-                    
-                    // Settle time for cermin DSLR turun
-                    Thread.Sleep(600);
-                }
+                wasLiveViewRunning = SuspendLiveView();
 
                 lock (_cameraLock)
                 {
@@ -494,18 +681,7 @@ namespace CanonHelper
             finally
             {
                 // 6. Resume live view if it was active
-                if (wasLiveViewRunning)
-                {
-                    Thread.Sleep(300);
-                    if (_liveViewTftMode)
-                    {
-                        HandleStartLiveViewTft();
-                    }
-                    else
-                    {
-                        HandleStartLiveView();
-                    }
-                }
+                ResumeLiveView(wasLiveViewRunning);
             }
         }
 
@@ -832,6 +1008,12 @@ namespace CanonHelper
 
         [System.Runtime.InteropServices.DllImport("EDSDK.dll", EntryPoint = "EdsSetPropertyData")]
         private static extern uint EdsSetPropertyData_Pin(IntPtr inRef, uint inPropertyID, int inParam, int inPropertySize, ref uint inPropertyData);
+        private const uint kEdsCameraCommand_PressShutterButton = 0x00000004;
+        private const int kEdsShutterButton_Off = 0;
+        private const int kEdsShutterButton_CompletelyNonAF = 0x00010003;
+        private const uint kEdsPropID_DriveMode = 0x00000401; // 0 single, 1 continuous, 4 high-speed continuous
+        private const uint kEdsPropID_ISOSpeed = 0x00000402;
+        private const uint kEdsPropID_Tv = 0x00000406;
 
         [System.Runtime.InteropServices.DllImport("EDSDK.dll", EntryPoint = "EdsSendCommand")]
         private static extern uint EdsSendCommand_Pin(IntPtr inCameraRef, uint inCommand, int inParam);

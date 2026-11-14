@@ -1,5 +1,7 @@
 // MUST be first import — loads .env before any module reads process.env
 import './lib/env'
+// MUST come before anything that registers IPC (ConfigService does so on import): wraps ipcMain.handle
+import './guard/gate'
 
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
@@ -14,6 +16,7 @@ import { registerCloudHandlers } from './ipc/cloud.ipc'
 import { registerQueueHandlers } from './ipc/queue.ipc'
 import { registerPaymentHandlers } from './ipc/payment.ipc'
 import './services/ConfigService' // Boot ConfigService natively
+import { initGuard, onGuardChange, startGuardLoop } from './guard/client'
 
 // Global safeguard to prevent Photobooth crash on USB/Hardware random disconnects
 process.on('uncaughtException', (error) => {
@@ -70,7 +73,20 @@ function createWindow(): void {
 }
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    // Booth Guard first: the IPC gate must know the lock state before the renderer makes its first call.
+    await initGuard()
+    // Lock or unlock: reload so every page (and any open camera stream) restarts under the new state.
+    let lastLocked: boolean | null = null
+    onGuardChange((view) => {
+        const flipped = lastLocked !== null && lastLocked !== view.locked
+        lastLocked = view.locked
+        for (const win of BrowserWindow.getAllWindows()) {
+            if (flipped) win.webContents.reload()
+            else win.webContents.send('guard:state', view)
+        }
+    })
+
     // Set app user model id for windows
     electronApp.setAppUserModelId('com.sebooth.app')
 
@@ -99,6 +115,7 @@ app.whenReady().then(() => {
     }).catch(err => console.error('Failed to start local sharing server:', err))
 
     createWindow()
+    startGuardLoop()
 
     app.on('activate', function () {
         if (BrowserWindow.getAllWindows().length === 0) createWindow()

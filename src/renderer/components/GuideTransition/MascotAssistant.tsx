@@ -59,6 +59,10 @@ const STEPS: Record<string, Step[]> = {
         { line: 'Cek sekali lagi sebelum dicetak' },
         { line: 'Ketuk tombol putih untuk cetak' }
     ],
+    '/flipbook': [
+        { line: 'Lihat gerakanmu jadi animasi' },
+        { line: 'Ketuk tombol putih untuk cetak' }
+    ],
     '/printing': [
         { line: 'Ambil cetakanmu di loket, ya' },
         { line: 'Simpan kode ambilnya' }

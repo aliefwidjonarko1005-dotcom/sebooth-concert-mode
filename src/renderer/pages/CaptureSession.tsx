@@ -50,6 +50,9 @@ function CaptureSession(): JSX.Element {
     const [currentSlotIndex, setCurrentSlotIndex] = useState(0)
     const [lastCapturedImage, setLastCapturedImage] = useState<string | null>(null)
     const [isLoadingCamera, setIsLoadingCamera] = useState(true)
+    const [initTry, setInitTry] = useState(1) // shown on the loading overlay while init retries
+    const [initRun, setInitRun] = useState(0) // bump to re-run the unified camera init ("Coba lagi")
+    const [burstSaving, setBurstSaving] = useState(false) // flipbook: shutter released, downloading frames
     const [cameraError, setCameraError] = useState<string | null>(null)
     // Bumped when the preview track dies (capture card re-enumerates after the DSLR shutter / HDMI drop)
     const [streamLost, setStreamLost] = useState(0)
@@ -138,7 +141,8 @@ function CaptureSession(): JSX.Element {
     // Start session on mount
     useEffect(() => {
         if (!currentSession && currentFrame) {
-            startSession(currentFrame.id, isConcert ? config.concertPrintQuantity || 2 : undefined)
+            // No payment page to choose a package on: with Flipbook on, every session is a flipbook
+            startSession(currentFrame.id, isConcert ? config.concertPrintQuantity || 2 : undefined, !!config.flipbookEnabled && !config.paymentEnabled && !isConcert)
         }
     }, [currentSession, currentFrame, startSession])
 
@@ -154,10 +158,13 @@ function CaptureSession(): JSX.Element {
         return Math.max(1, Math.ceil((deadline - Date.now()) / 1000))
     }, [deadline])
 
-    // Initialize webcam
-    const initWebcam = useCallback(async (): Promise<void> => {
-        setIsLoadingCamera(true)
-        setCameraError(null)
+    // Initialize webcam. Returns the error message (null on success); `quiet` leaves the
+    // loading/error overlay to the caller so a retry loop doesn't flash the error between tries.
+    const initWebcam = useCallback(async (quiet = false): Promise<string | null> => {
+        if (!quiet) {
+            setIsLoadingCamera(true)
+            setCameraError(null)
+        }
 
         // Stop any existing stream tracks first to release browser resource locks
         if (streamRef.current) {
@@ -270,7 +277,8 @@ function CaptureSession(): JSX.Element {
             if (videoRef.current) {
                 videoRef.current.srcObject = stream
             }
-            setIsLoadingCamera(false)
+            if (!quiet) setIsLoadingCamera(false)
+            return null
         } catch (error) {
             console.error('Failed to access webcam:', error)
             const err = error as Error
@@ -280,16 +288,40 @@ function CaptureSession(): JSX.Element {
                 message = 'Camera permission denied. Please allow camera access.'
             } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
                 message = 'No camera found on this device.'
+            } else if (err.name === 'OverconstrainedError') {
+                message = 'Capture card tidak ditemukan. Cek kabel USB capture card, atau pilih ulang di Admin.'
             } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
                 message = 'Camera is being used by another application.'
             } else if (err.message) {
                 message = err.message
             }
 
-            setCameraError(message)
-            setIsLoadingCamera(false)
+            if (!quiet) {
+                setCameraError(message)
+                setIsLoadingCamera(false)
+            }
+            return message
         }
     }, [config.selectedCameraId, config.cameraMode])
+
+    // A capture card can hand over a stream that never carries a frame (HDMI not up yet): wait for real frames
+    const waitForFrames = (timeoutMs: number) => new Promise<boolean>(resolve => {
+        const video = videoRef.current as (HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }) | null
+        if (!video?.requestVideoFrameCallback) return resolve(true)
+        let seen = 0
+        const timer = setTimeout(() => resolve(false), timeoutMs)
+        const onFrame = () => {
+            if (++seen >= 3) { clearTimeout(timer); resolve(true) }
+            else video.requestVideoFrameCallback!(onFrame)
+        }
+        video.requestVideoFrameCallback(onFrame)
+    })
+
+    const stopPreviewStream = () => {
+        streamRef.current?.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+        if (videoRef.current) videoRef.current.srcObject = null
+    }
 
     // (Webcam/capture card is opened by the unified init effect below. A second mount-time
     // initWebcam() used to race it: the later call stopped the live stream a few seconds in,
@@ -304,8 +336,9 @@ function CaptureSession(): JSX.Element {
         }
 
         if (captureState === 'idle') {
-            // Only re-init if stream was previously stopped (null) and we're not already loading
-            if (!streamRef.current && !isLoadingCamera) {
+            // Only re-init if stream was previously stopped (null) and we're not already loading.
+            // Not after a failed init: that looped initWebcam forever without live view ("Coba lagi" re-runs init).
+            if (!streamRef.current && !isLoadingCamera && !cameraError) {
                 console.log('[CaptureSession] Re-initializing webcam after capture (state:', captureState, ')')
                 initWebcam()
             }
@@ -319,7 +352,7 @@ function CaptureSession(): JSX.Element {
                 }
             }
         }
-    }, [captureState, config.cameraMode, config.selectedCameraId, initWebcam, isLoadingCamera, streamLost])
+    }, [captureState, config.cameraMode, config.selectedCameraId, initWebcam, isLoadingCamera, streamLost, cameraError])
 
     // Cleanup on unmount
     useEffect(() => {
@@ -360,44 +393,68 @@ function CaptureSession(): JSX.Element {
         const initializeCamera = async () => {
             setIsLoadingCamera(true);
             setCameraError(null);
+            setInitTry(1);
 
             const isDslr = config.cameraMode === 'edsdk' || config.cameraMode === 'ptp';
             const hasCaptureCard = !!config.selectedCameraId;
+            const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
             try {
-                // Step 1: Start DSLR Live View first to establish HDMI signal before opening capture card stream
-                // On retake, live view is usually still active (we don't stop it on navigate to /photo-review)
-                // so we can skip the expensive re-init + HDMI wait entirely.
-                if (isDslr) {
-                    let liveViewAlreadyActive = false;
-                    try {
-                        const lvStatus = await window.api.camera.isLiveViewActive();
-                        liveViewAlreadyActive = !!(lvStatus.success && lvStatus.data);
-                    } catch {
-                        // Older builds without the IPC: fall through to normal init
-                    }
-
-                    if (liveViewAlreadyActive) {
-                        console.log('[CaptureSession] Unified Init: DSLR Live View already active — skipping re-init (retake fast path)');
-                    } else {
-                        console.log('[CaptureSession] Unified Init: Starting DSLR Live View...');
-                        await window.api.camera.startLiveView();
-                    
-                        // Delay to let the HDMI transmitter/capture card hardware stabilize the video signal
-                        if (hasCaptureCard) {
-                            console.log('[CaptureSession] Unified Init: Waiting for HDMI signal stability (2000ms)...');
-                            await new Promise(resolve => setTimeout(resolve, 2000));
-                        }
-                    }
-                }
-
-                if (!active) return;
-
-                // Step 2: Initialize Web Video Stream (Capture Card or Webcam)
+                // Steps 1+2 retried as a unit: live view or the HDMI link randomly fails to come up, and a
+                // stream opened without signal never shows a frame (loading ends on a frozen/black preview).
                 if (hasCaptureCard || !isDslr) {
-                    console.log('[CaptureSession] Unified Init: Initializing webcam/capture card stream...');
-                    await initWebcam();
+                    let lastError = '';
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        if (!active) return;
+                        setInitTry(attempt);
+                        if (attempt > 1) {
+                            stopPreviewStream();
+                            await sleep(1000);
+                        }
+
+                        // Step 1: Start DSLR Live View first to establish HDMI signal before opening capture card stream.
+                        // On retake live view is usually still active (not stopped on /photo-review) → skip re-init + HDMI wait.
+                        let liveViewAlreadyActive = false;
+                        if (isDslr && attempt === 1) {
+                            try {
+                                const lvStatus = await window.api.camera.isLiveViewActive();
+                                liveViewAlreadyActive = !!(lvStatus.success && lvStatus.data);
+                            } catch {
+                                // Older builds without the IPC: fall through to normal init
+                            }
+                            if (liveViewAlreadyActive) console.log('[CaptureSession] Unified Init: DSLR Live View already active — skipping re-init (retake fast path)');
+                        }
+                        if (isDslr && !liveViewAlreadyActive) {
+                            console.log(`[CaptureSession] Unified Init (try ${attempt}): Starting DSLR Live View...`);
+                            const lv = await window.api.camera.startLiveView();
+                            if (!lv?.success || !lv.data) {
+                                lastError = 'Live view kamera Canon tidak menyala. Pastikan kamera menyala dan tidak sleep.';
+                                console.warn('[CaptureSession] Unified Init: live view failed', lv?.error);
+                                continue;
+                            }
+                            // Delay to let the HDMI transmitter/capture card hardware stabilize the video signal
+                            console.log('[CaptureSession] Unified Init: Waiting for HDMI signal stability (2000ms)...');
+                            await sleep(2000);
+                        }
+                        if (!active) return;
+
+                        // Step 2: Initialize Web Video Stream (Capture Card or Webcam)
+                        console.log('[CaptureSession] Unified Init: Initializing webcam/capture card stream...');
+                        const err = await initWebcam(true);
+                        if (!active) return;
+                        if (err) { lastError = err; continue; }
+                        if (await waitForFrames(6000)) { lastError = ''; break; }
+                        lastError = 'Capture card tidak menerima gambar dari kamera. Cek kabel HDMI dan kamera.';
+                        console.warn(`[CaptureSession] Unified Init (try ${attempt}): stream opened but no frames`);
+                    }
+                    if (!active) return;
+                    if (lastError) {
+                        stopPreviewStream();
+                        throw new Error(lastError);
+                    }
                 } else if (isDslr && !hasCaptureCard) {
+                    console.log('[CaptureSession] Unified Init: Starting DSLR Live View...');
+                    await window.api.camera.startLiveView();
                     // DSLR mode without capture card: start USB image polling
                     console.log('[CaptureSession] Unified Init: Starting USB live view polling...');
                     const urlResult = await window.api.camera.getLiveViewUrl();
@@ -430,7 +487,7 @@ function CaptureSession(): JSX.Element {
             }
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [config.cameraMode, config.selectedCameraId, initWebcam])
+    }, [config.cameraMode, config.selectedCameraId, initWebcam, initRun])
 
     // Find next empty slot (skips duplicate slots)
     const getNextEmptySlot = useCallback(() => {
@@ -569,7 +626,9 @@ function CaptureSession(): JSX.Element {
             }
         }
 
-        if (isEdsdkMode) {
+        if (useSessionStore.getState().currentSession?.flipbook) {
+            // Flipbook burst has no live photo; recording would also fight the burst for the camera
+        } else if (isEdsdkMode) {
             console.log('[CaptureSession] Starting camera Live Photo recording...');
             window.api.camera.startRecordingLivePhoto(slot.id)
                 .then((res: any) => {
@@ -611,6 +670,23 @@ function CaptureSession(): JSX.Element {
 
         setCaptureState('capturing')
         const slot = currentFrame.slots[slotIndex]
+
+        if (useSessionStore.getState().currentSession?.flipbook) {
+            const burstMs = (config.flipbookDurationSec ?? 4) * 1000
+            setBurstSaving(false)
+            // Shutter opens ~0.8 s after the call (live view suspend); after the hold only the download is left
+            setTimeout(() => setBurstSaving(true), burstMs + 800)
+            window.api.camera.burst(burstMs)
+                .then((res: { success: boolean; data?: string[]; error?: string }) => {
+                    if (!res.success || !res.data?.length) {
+                        setCameraError(`Burst flipbook gagal: ${res.error || 'tidak ada foto'}. Pastikan kamera Canon dalam mode continuous.`)
+                        setCaptureState('idle')
+                        return
+                    }
+                    navigate('/flipbook', { state: { frames: res.data } })
+                })
+            return
+        }
 
         // Helper to complete capture after optional video save
         const completeCapture = (videoUrl?: string) => {
@@ -815,11 +891,15 @@ function CaptureSession(): JSX.Element {
     const cameraReady = !isLoadingCamera && !cameraError && (!needsPreviewStream || !!streamRef.current)
     // The keydown effect keeps an old handleReady closure, so read readiness through a ref
     cameraReadyRef.current = cameraReady
+    const cameraErrorRef = useRef<string | null>(null)
+    cameraErrorRef.current = cameraError
 
     // Handle ready button
     const handleReady = (): void => {
         if (!cameraReadyRef.current) {
-            console.warn('[CaptureSession] Ignoring shutter press: camera preview not ready yet')
+            // Button 3 on the error overlay = "Coba lagi"
+            if (cameraErrorRef.current) setInitRun(n => n + 1)
+            else console.warn('[CaptureSession] Ignoring shutter press: camera preview not ready yet')
             return
         }
         const next = getNextEmptySlot()
@@ -988,7 +1068,8 @@ function CaptureSession(): JSX.Element {
         : {
             1: { label: 'Batalkan sesi', onScreen: true },
             2: { label: wideView ? 'Default view' : 'Wide view', onScreen: true },
-            ...(cameraReady ? { 3: { label: allSlotsFilled ? 'Ulangi foto' : 'Ambil foto', primary: true, onScreen: true } } : {})
+            ...(cameraReady ? { 3: { label: allSlotsFilled ? 'Ulangi foto' : 'Ambil foto', primary: true, onScreen: true } }
+                : cameraError ? { 3: { label: 'Coba lagi', primary: true, onScreen: true } } : {})
         })
     useRailStatus(`Foto ${shotNumber}/${captureSlots.length}`)
 
@@ -1197,7 +1278,7 @@ function CaptureSession(): JSX.Element {
                     {isLoadingCamera && (
                         <div className={styles.loadingOverlay}>
                             <div className={styles.spinner}></div>
-                            <p>Menyiapkan kamera...</p>
+                            <p>Menyiapkan kamera...{initTry > 1 && ` (percobaan ${initTry})`}</p>
                         </div>
                     )}
 
@@ -1207,7 +1288,7 @@ function CaptureSession(): JSX.Element {
                             <h3>Kamera bermasalah</h3>
                             <p>{cameraError}</p>
                             <button
-                                onClick={() => window.location.reload()}
+                                onClick={() => setInitRun(n => n + 1)}
                                 className={styles.retryButton}
                             >
                                 Coba lagi
@@ -1234,7 +1315,17 @@ function CaptureSession(): JSX.Element {
 
                     {/* Capturing Flash */}
                     <AnimatePresence>
-                        {captureState === 'capturing' && (
+                        {captureState === 'capturing' && currentSession?.flipbook && (
+                            <motion.div
+                                className={styles.burstBanner}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                            >
+                                <span className="kiosk-title">{burstSaving ? 'Menyimpan foto...' : 'Terus bergerak!'}</span>
+                            </motion.div>
+                        )}
+                        {captureState === 'capturing' && !currentSession?.flipbook && (
                             <motion.div
                                 className={styles.flashOverlay}
                                 initial={{ opacity: 0 }}

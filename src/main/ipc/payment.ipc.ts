@@ -1,6 +1,8 @@
 import { IpcMain, BrowserWindow } from 'electron'
 import crypto from 'crypto'
 import { configService } from '../services/ConfigService'
+import { GUARD_ENABLED } from '@shared/guardPins'
+import { guardRequest } from '../guard/client'
 
 // Helper to extract QR code offscreen from DOKU checkout page
 async function extractDokuQrCode(paymentUrl: string): Promise<{ qrisUrl: string | null; qrString: string | null }> {
@@ -126,11 +128,108 @@ function generateDokuSignature(
     return `HMACSHA256=${signature}`
 }
 
+async function dokuCreateResult(ok: boolean, data: any, orderId: string) {
+    if (ok && data?.response?.payment?.url) {
+        const paymentUrl = data.response.payment.url
+        const expiredDatetime = data.response.payment.expired_datetime || data.response.payment.expired_date || null
+        console.log(`[doku.ipc] Checkout session created. URL: ${paymentUrl}. Downloading QR code offscreen...`)
+
+        // Extract QR code image / string offscreen
+        const extracted = await extractDokuQrCode(paymentUrl)
+
+        return {
+            success: true,
+            data: {
+                paymentUrl: paymentUrl,
+                invoiceNumber: orderId,
+                qrisUrl: extracted.qrisUrl || paymentUrl,
+                qrString: extracted.qrString || null,
+                expiredDatetime: expiredDatetime,
+                paymentDueDateMinutes: data.response.payment.payment_due_date || 60
+            }
+        }
+    }
+    console.error('[doku.ipc] Doku API error response:', data)
+    return {
+        success: false,
+        error: data?.message || (data?.error && data.error.message) || 'Gagal membuat sesi pembayaran DOKU'
+    }
+}
+
+function dokuStatusResult(ok: boolean, data: any, invoiceNumber: string) {
+    if (ok && data?.transaction) {
+        const status = data.transaction.status
+        console.log(`[doku.ipc] Order ${invoiceNumber} status checked: ${status}`)
+        return {
+            success: true,
+            data: {
+                status: status, // PENDING, SUCCESS, FAILED
+                raw: data
+            }
+        }
+    }
+    console.error('[doku.ipc] Doku check status error:', data)
+    return {
+        success: false,
+        error: data?.message || 'Gagal memeriksa status pembayaran DOKU'
+    }
+}
+
+// Gateway answer as { ok, data }. With Booth Guard on, the website signs the request with merchant keys
+// that never reach the booth (/api/booth/payment); otherwise the booth's own configured keys are used.
+type Upstream = { ok: boolean; data: any }
+
+async function viaGuard(gateway: 'doku' | 'midtrans', op: 'create' | 'status', orderId: string, amount?: number): Promise<Upstream> {
+    const r = await guardRequest('/api/booth/payment', { gateway, op, orderId, amount })
+    if (!r) throw new Error('Server pembayaran tidak terjangkau. Cek koneksi internet.')
+    if (r.error) throw new Error(r.error)
+    return { ok: !!r.ok, data: r.data }
+}
+
+async function midtransUpstream(op: 'create' | 'status', orderId: string, amount?: number): Promise<Upstream> {
+    if (GUARD_ENABLED) return viaGuard('midtrans', op, orderId, amount)
+    const key = configService.getConfig().midtransServerKey
+    if (!key) throw new Error('Midtrans Server Key belum dikonfigurasi di Admin Panel')
+    const headers = { Authorization: `Basic ${Buffer.from(`${key}:`).toString('base64')}`, Accept: 'application/json' }
+    const res = op === 'status'
+        ? await fetch(`https://api.sandbox.midtrans.com/v2/${orderId}/status`, { headers })
+        : await fetch('https://api.sandbox.midtrans.com/v2/charge', {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ payment_type: 'qris', transaction_details: { order_id: orderId, gross_amount: amount }, qris: { acquirer: 'gopay' } })
+        })
+    return { ok: res.ok, data: await res.json() }
+}
+
 export function registerPaymentHandlers(ipcMain: IpcMain): void {
+    // Midtrans QRIS (was called from the renderer with the server key in it)
+    ipcMain.handle('payment:midtrans-charge', async (_, params: { orderId: string; amount: number }) => {
+        try {
+            return { success: true, data: (await midtransUpstream('create', params.orderId, params.amount)).data }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+    ipcMain.handle('payment:midtrans-status', async (_, params: { orderId: string }) => {
+        try {
+            return { success: true, data: (await midtransUpstream('status', params.orderId)).data }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+
     // 1. Create Doku Checkout Session
     ipcMain.handle('payment:doku-create-session', async (_, params: { orderId: string; amount: number }) => {
+        if (GUARD_ENABLED) {
+            try {
+                const { ok, data } = await viaGuard('doku', 'create', params.orderId, params.amount)
+                return await dokuCreateResult(ok, data, params.orderId)
+            } catch (error: any) {
+                return { success: false, error: error.message }
+            }
+        }
         const config = configService.getConfig()
-        
+
         if (!config.dokuClientId || !config.dokuSecretKey) {
             return {
                 success: false,
@@ -138,7 +237,7 @@ export function registerPaymentHandlers(ipcMain: IpcMain): void {
             }
         }
 
-        const baseUrl = config.dokuSandbox 
+        const baseUrl = config.dokuSandbox
             ? 'https://api-sandbox.doku.com' 
             : 'https://api.doku.com'
             
@@ -184,34 +283,7 @@ export function registerPaymentHandlers(ipcMain: IpcMain): void {
                 body: bodyString
             })
 
-            const data: any = await response.json()
-            
-            if (response.ok && data.response?.payment?.url) {
-                const paymentUrl = data.response.payment.url
-                const expiredDatetime = data.response.payment.expired_datetime || data.response.payment.expired_date || null
-                console.log(`[doku.ipc] Checkout session created. URL: ${paymentUrl}. Downloading QR code offscreen...`)
-
-                // Extract QR code image / string offscreen
-                const extracted = await extractDokuQrCode(paymentUrl)
-
-                return {
-                    success: true,
-                    data: {
-                        paymentUrl: paymentUrl,
-                        invoiceNumber: params.orderId,
-                        qrisUrl: extracted.qrisUrl || paymentUrl,
-                        qrString: extracted.qrString || null,
-                        expiredDatetime: expiredDatetime,
-                        paymentDueDateMinutes: data.response.payment.payment_due_date || 60
-                    }
-                }
-            } else {
-                console.error('[doku.ipc] Doku API error response:', data)
-                return {
-                    success: false,
-                    error: data.message || (data.error && data.error.message) || 'Gagal membuat sesi pembayaran DOKU'
-                }
-            }
+            return await dokuCreateResult(response.ok, await response.json(), params.orderId)
         } catch (error: any) {
             console.error('[doku.ipc] Doku session creation network error:', error)
             return {
@@ -224,6 +296,14 @@ export function registerPaymentHandlers(ipcMain: IpcMain): void {
 
     // 2. Check Doku Checkout Payment Status
     ipcMain.handle('payment:doku-check-status', async (_, params: { invoiceNumber: string }) => {
+        if (GUARD_ENABLED) {
+            try {
+                const { ok, data } = await viaGuard('doku', 'status', params.invoiceNumber)
+                return dokuStatusResult(ok, data, params.invoiceNumber)
+            } catch (error: any) {
+                return { success: false, error: error.message }
+            }
+        }
         const config = configService.getConfig()
         
         if (!config.dokuClientId || !config.dokuSecretKey) {
@@ -256,25 +336,7 @@ export function registerPaymentHandlers(ipcMain: IpcMain): void {
                 }
             })
 
-            const data: any = await response.json()
-            
-            if (response.ok && data.transaction) {
-                const status = data.transaction.status
-                console.log(`[doku.ipc] Order ${params.invoiceNumber} status checked: ${status}`)
-                return {
-                    success: true,
-                    data: {
-                        status: status, // PENDING, SUCCESS, FAILED
-                        raw: data
-                    }
-                }
-            } else {
-                console.error('[doku.ipc] Doku check status error:', data)
-                return {
-                    success: false,
-                    error: data.message || 'Gagal memeriksa status pembayaran DOKU'
-                }
-            }
+            return dokuStatusResult(response.ok, await response.json(), params.invoiceNumber)
         } catch (error: any) {
             console.error('[doku.ipc] Doku check status network error:', error)
             return {

@@ -25,6 +25,7 @@ const SCRIPT: Record<string, { act: Act; line: string }> = {
     '/output': { act: 'print', line: 'Taraa, hasilnya!' },
     '/sharing': { act: 'curtain', line: 'Scan buat simpan' },
     '/finalize': { act: 'print', line: 'Siap dicetak?' },
+    '/flipbook': { act: 'print', line: 'Flipbook jadi!' },
     '/printing': { act: 'print', line: 'Lagi dicetak...' }
 }
 

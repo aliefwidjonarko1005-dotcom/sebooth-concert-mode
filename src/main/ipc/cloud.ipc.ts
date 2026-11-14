@@ -2,7 +2,10 @@ import { ipcMain } from 'electron';
 import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import fs from 'fs';
-import { uploadQueue } from '../services/UploadQueue';
+import { readFile } from 'fs/promises';
+import { uploadQueue, type QueuedUpload } from '../services/UploadQueue';
+import { GUARD_ENABLED } from '@shared/guardPins';
+import { guardRequest } from '../guard/client';
 import { getGCSKeyPath } from '../lib/paths';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, GCS_BUCKET_NAME } from '@shared/supabaseConfig';
@@ -30,7 +33,43 @@ try {
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 
 export function isCloudUploadReady(): boolean {
-  return storage !== null;
+  return storage !== null || GUARD_ENABLED;
+}
+
+// Booth Guard path: the website signs one upload URL per file and writes the rows itself, only for
+// approved booths. No GCS key or anon write is needed on the kiosk.
+async function drainViaGuard(item: QueuedUpload): Promise<'done' | 'retry'> {
+  if (item.kind === 'db') {
+    const r = await guardRequest('/api/booth/rows', { table: item.table, row: item.row });
+    if (r?.success) return 'done';
+    if (r?.dropped) {
+      console.error(`[Cloud Queue] Dropping DB row for ${item.table}:`, r.error);
+      return 'done';
+    }
+    return 'retry';
+  }
+  if (!fs.existsSync(item.filePath)) {
+    console.warn(`[Cloud Queue] Queue item file missing, removing from queue: ${item.filePath}`);
+    return 'done';
+  }
+  const r = await guardRequest('/api/booth/upload-url', { destinationPath: item.destinationPath, contentType: item.mimeType });
+  if (r?.dropped) {
+    console.error(`[Cloud Queue] Server refused ${item.destinationPath}:`, r.error);
+    return 'done';
+  }
+  if (!r?.url) return 'retry';
+  try {
+    const res = await fetch(r.url, { method: 'PUT', headers: r.headers, body: await readFile(item.filePath) });
+    // 412: the object already exists (an earlier attempt succeeded but its answer was lost)
+    if (res.ok || res.status === 412) {
+      console.log(`[Cloud Queue] Uploaded: ${item.destinationPath}`);
+      return 'done';
+    }
+    console.error(`[Cloud Queue] Signed upload failed (${res.status}) for ${item.destinationPath}, will retry`);
+  } catch {
+    console.error(`[Cloud Queue] Signed upload failed for ${item.destinationPath}, will retry`);
+  }
+  return 'retry';
 }
 
 // Background worker: drains the persisted queue in order (files before the DB rows that reference them).
@@ -43,6 +82,15 @@ async function drainQueue(): Promise<void> {
 
   try {
     for (const item of pending) {
+      if (GUARD_ENABLED) {
+        if ((await drainViaGuard(item)) === 'retry') {
+          uploadQueue.incrementRetry(item.id);
+          break; // keep order, try again next tick
+        }
+        uploadQueue.markSuccessful(item.id);
+        continue;
+      }
+
       if (item.kind === 'db') {
         const { error } = await supabase.from(item.table!).upsert(item.row!, item.onConflict ? { onConflict: item.onConflict } : undefined);
         if (!error) {

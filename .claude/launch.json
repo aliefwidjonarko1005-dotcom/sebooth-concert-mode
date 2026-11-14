@@ -20,6 +20,16 @@
         "9222"
       ],
       "port": 5173
+    },
+    {
+      "name": "sebooth-preview-build",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "electron",
+        ".",
+        "--remote-debugging-port=9222"
+      ],
+      "port": 5050
     }
   ]
 }

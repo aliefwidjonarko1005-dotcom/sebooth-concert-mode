@@ -11,7 +11,11 @@ import { useElementSize } from '../lib/useElementHeight'
 import { isWideView, toggleViewZoom } from '@shared/viewZoom'
 
 
-const ADMIN_PASSWORD = 'admin123'
+
+// Canon kEdsPropID_Aspect values: zoom in = 1.6x crop, zoom out = full frame (wide).
+const ASPECT = { in: '13', out: '0' } as const
+// Survives Landing remounts; the camera itself keeps the setting between sessions.
+let lastZoom: 'in' | 'out' | null = null
 
 const formatFilePath = (p?: string): string => {
     if (!p) return ''
@@ -38,6 +42,32 @@ function Landing(): JSX.Element {
     const [holdProgress, setHoldProgress] = useState(0)
     const [holdTimer, setHoldTimer] = useState<any | null>(null)
     const [showCameraMenu, setShowCameraMenu] = useState(false)
+    const [zoom, setZoomState] = useState(lastZoom)
+    const canZoom = config.cameraMode === 'edsdk'
+
+    const setZoom = useCallback((z: 'in' | 'out') => {
+        if (!canZoom) return
+        lastZoom = z
+        setZoomState(z)
+        window.api.camera.setProperty('aspect', ASPECT[z]).catch(() => {})
+    }, [canZoom])
+
+    // PIN is checked in main (hash set by the owner via Booth Guard, attempt-limited)
+    const tryAdminPin = useCallback(async (pin: string) => {
+        const res = await (window as any).api?.system?.verifyAdminPin?.(pin).catch(() => null)
+        if (res?.data?.ok) {
+            setShowAdminModal(false)
+            setPinSequence('')
+            setAdminPassword('')
+            navigate('/admin')
+            return
+        }
+        setPasswordError(true)
+        setTimeout(() => {
+            setPasswordError(false)
+            setPinSequence('')
+        }, 1000)
+    }, [navigate])
 
     // Live Camera Background States
     const videoRef = useRef<HTMLVideoElement>(null)
@@ -227,19 +257,7 @@ function Landing(): JSX.Element {
                     e.preventDefault()
                     const nextSeq = pinSequence + e.key
                     setPinSequence(nextSeq)
-                    
-                    if (nextSeq === '123' || nextSeq === '1234') {
-                        setShowAdminModal(false)
-                        setPinSequence('')
-                        setAdminPassword('')
-                        navigate('/admin')
-                    } else if (nextSeq.length >= 3) {
-                        setPasswordError(true)
-                        setTimeout(() => {
-                            setPasswordError(false)
-                            setPinSequence('')
-                        }, 1000)
-                    }
+                    if (nextSeq.length >= (config.adminPinLength || 3)) tryAdminPin(nextSeq)
                 }
                 return
             }
@@ -247,6 +265,9 @@ function Landing(): JSX.Element {
             // Normal Landing Page Key Navigation
             if (e.key === '1') {
                 if (e.repeat) return
+                setZoom('in')
+                // Touch dock sends keydown only (untrusted, no keyup) → never start the admin hold there
+                if (!e.isTrusted) return
                 // Start 5-second hold timer for Key 1
                 key1PressTimeRef.current = Date.now()
                 clearKey1Timer()
@@ -268,7 +289,10 @@ function Landing(): JSX.Element {
 
             } else if (e.key === '2') {
                 e.preventDefault()
-                if (liveCameraEnabled) toggleView()
+                if (e.repeat) return
+                // EDSDK: Canon aspect crop (1 = in, 2 = out); other modes: digital Default/Wide view toggle
+                if (canZoom) setZoom('out')
+                else if (liveCameraEnabled) toggleView()
             } else if (e.key === '3') {
                 e.preventDefault()
                 handleStart()
@@ -298,24 +322,19 @@ function Landing(): JSX.Element {
             window.removeEventListener('keyup', handleKeyUp)
             clearKey1Timer()
         }
-    }, [showAdminModal, pinSequence, handleStart, clearKey1Timer, navigate, liveCameraEnabled, toggleView])
+    }, [showAdminModal, pinSequence, handleStart, clearKey1Timer, navigate, liveCameraEnabled, toggleView, canZoom, setZoom, tryAdminPin, config.adminPinLength])
 
     const handleAdminSubmit = (e: React.FormEvent): void => {
         e.preventDefault()
-        if (adminPassword === '123' || adminPassword === ADMIN_PASSWORD || pinSequence === '123') {
-            setShowAdminModal(false)
-            setAdminPassword('')
-            setPinSequence('')
-            navigate('/admin')
-        } else {
-            setPasswordError(true)
-            setTimeout(() => setPasswordError(false), 2000)
-        }
+        tryAdminPin(adminPassword || pinSequence)
     }
 
     const touch = useInputMode() === 'touch'
     useButtonHints({
-        ...(liveCameraEnabled ? { 2: { label: wideView ? 'Default view' : 'Wide view', onScreen: true } } : {}),
+        ...(canZoom ? {
+            1: { label: zoom === 'in' ? 'Zoom in (aktif)' : 'Zoom in' },
+            2: { label: zoom === 'out' ? 'Zoom out (aktif)' : 'Zoom out' }
+        } : liveCameraEnabled ? { 2: { label: wideView ? 'Default view' : 'Wide view', onScreen: true } } : {}),
         3: { label: 'Mulai foto', primary: true, onScreen: true }
     })
     const art = { ...DEFAULT_AMBIENT_ART, ...config.landingArt }

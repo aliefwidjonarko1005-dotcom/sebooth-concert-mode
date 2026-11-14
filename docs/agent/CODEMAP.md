@@ -23,6 +23,7 @@ Browser/iPad (remote admin) ──fetch──> main/server.ts (Express :5050) �
 | Animasi abstrak beranda (gradasi 2D, overlay live cam) | `renderer/components/brand/AmbientArt.tsx` (canvas: aurora/shapes/waves), config `landingArt`, layer `.artLayer` di `Landing.module.css`, kartu "Animasi Beranda" di Admin tab timers |
 | Brand: logo animasi, font, tema poster | `renderer/components/brand/SeboothLogo.tsx` (+ `seboothLogoParts.ts`, port dari website), `renderer/styles/brand.css` (`.kiosk-title`, `.kiosk-kicker`, `.kiosk-num`), token `--brand-*` di `global.css` |
 | Kamera DSLR Canon | `main/handlers/CanonEDSDKCamera.ts` (1042) ↔ `main/lib/canon/CanonHelper.cs` (629, compile → `CanonHelper.exe`) |
+| ISO/shutter Canon + template indoor/outdoor | tabel `shared/canonExposure.ts`, `CanonEDSDKCamera.setExposureProp` → helper `SET_PROP`, dipasang saat connect (`applyExposurePreset`), kartu "Eksposur kamera" di Admin tab Printers |
 | Kamera lain | `main/handlers/`: `DigiCamHTTPCamera`, `DigiCamControlCamera`, `WIACamera`, `WIAShutterCamera`, `GPhotoCamera`, `MockCamera`; interface `CameraHandler.ts` |
 | Pilih handler kamera / capture IPC | `main/ipc/camera.ipc.ts` (279) |
 | Live view + countdown + capture UI | `renderer/pages/CaptureSession.tsx` (1521 — terbesar, baca per bagian) |
@@ -39,6 +40,10 @@ Browser/iPad (remote admin) ──fetch──> main/server.ts (Express :5050) �
 | Bersih-bersih temp | `main/services/Janitor.ts` |
 | Path userData/temp/resources | `main/lib/paths.ts`, env: `main/lib/env.ts` |
 | Global crash guard, bootstrap | `main/index.ts` |
+| Booth Guard (approval, lockdown, remote command, clone detection) | `main/guard/` (`client.ts` state machine, `protocol.ts`, `identity.ts`, `gate.ts`), pin `shared/guardPins.ts`, `renderer/components/LockScreen/`; panduan `docs/agent/BOOTH_GUARD.md` |
+| Kunci LAN :5050, PIN admin | `main/lib/lanKey.ts`, `main/lib/adminPin.ts` |
+| Fuses / bytecode build | `scripts/afterPack.cjs`, `electron.vite.config.ts` |
+| Update jarak jauh (rilis GCS) | `main/guard/updater.ts`, `scripts/publish-release.mjs`, `build.publish` di `package.json` |
 | Admin Dashboard | `renderer/pages/AdminDashboard.tsx` (3769 — **jangan baca utuh**; grep `activeTab === '<tab>'`) |
 | Portrait / tema | `.module.css` tiap page (`:global(body.app-portrait)`), `renderer/styles/global.css`; lebar stage = `100vw - var(--rail-w)` |
 
@@ -52,6 +57,7 @@ Browser/iPad (remote admin) ──fetch──> main/server.ts (Express :5050) �
 | `/capture` | `CaptureSession.tsx` (1521) | live view, countdown, capture, live photo |
 | `/photo-review` | `PhotoReviewPage.tsx` (267) | pratinjau strip + retake (konser → `/finalize`) |
 | `/finalize` | `FinalizePage.tsx` | konser: preview strip, key 2 mirror, key 3/auto 15s cetak |
+| `/flipbook` | `FlipbookPage.tsx` | paket flipbook: frame burst dari router state → `image:flipbook-sheets` (`services/FlipbookSheets.ts`) → preview animasi → cetak semua lembar berurutan (`printer:print`), auto 20s |
 | `/loket` | `PickupCounter.tsx` | dashboard loket (juga dari HP: `http://<ip>:5050/#/loket`): cari kode, filter status/booth, tandai diambil, cetak ulang (satu/semua gagal), status booth via heartbeat. Selalu lewat HTTP `/api/print/*` di `server.ts` |
 | `/review` | `ReviewSession.tsx` (340) | carousel filter, mirror |
 | `/output` | `OutputPage.tsx` (890) | carousel strip/GIF/live photo, generate output |
@@ -63,12 +69,12 @@ Browser/iPad (remote admin) ──fetch──> main/server.ts (Express :5050) �
 Komponen: `ConfirmBackHomeModal`, `EmailModal`, `PrintQuantityModal`, `QRCodeModal`, `SessionTimer`.
 
 ## IPC (`ns:action`)
-- **camera**: connect disconnect list status capture start-/stop-liveview get-liveview-url get-/set-property get-available-values start-/stop-recording-live-photo use-canon-edsdk use-direct-ptp use-mock use-real
+- **camera**: connect disconnect list status capture burst start-/stop-liveview get-liveview-url get-/set-property get-available-values start-/stop-recording-live-photo use-canon-edsdk use-direct-ptp use-mock use-real
 - **system**: finalize-session save-session-locally generate-hq-gif read-file-base64 save-data-url copy-file file-exists find-session-strip rename-session-folder read-/write-json open-file-dialog get-temp-path get-user-data-path get-local-ip
-- **image**: composite apply-filter generate-gif resize metadata
+- **image**: composite apply-filter generate-gif flipbook-sheets resize metadata
 - **printer**: list default print print-with-options remote-print check-print-server get-queue get-history
 - **queue**: start-/stop-polling get-status generate-token send-session-started send-session-completed skip-ticket
-- **payment**: doku-create-session doku-check-status · **cloud**: upload-file get-queue · **drive**: upload-session · **email**: send is-configured · **config**: get update · **window**: toggle-fullscreen toggle-kiosk
+- **payment**: doku-create-session doku-check-status midtrans-charge midtrans-status (via `/api/booth/payment` saat Booth Guard aktif) · **cloud**: upload-file get-queue · **drive**: upload-session · **email**: send is-configured · **config**: get update · **window**: toggle-fullscreen toggle-kiosk · **guard**: get-state (+ event `guard:state`) · **system**: get-lan-key verify-admin-pin
 
 ## Express (`main/server.ts`, :5050)
 `GET /api/config` `POST /api/config` · `GET /api/sessions` · `GET /api/camera/liveview` · `GET /api/print/queue` `GET /api/print/history` `POST /api/print/:sessionId` · `POST /api/remote-print` `GET /api/remote-print/status` · `GET /gallery/:sessionId` · `GET /monitor`

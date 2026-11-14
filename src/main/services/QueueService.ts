@@ -5,6 +5,16 @@ import {
     QueueWebhookResponse,
     QueueSessionTokenResponse
 } from '@shared/types'
+import { GUARD_ENABLED } from '@shared/guardPins'
+import { guardRequest } from '../guard/client'
+
+// Booth Guard: queue calls are signed by the device key instead of the shared webhook secret,
+// and go to the Booth Guard API base (the same website).
+async function viaGuard(path: string, payload: Record<string, unknown>): Promise<unknown> {
+    const data = await guardRequest(path, payload)
+    if (!data) throw new Error('Queue server unreachable or booth not approved')
+    return data
+}
 
 /**
  * QueueService — Main Process service for communicating with the
@@ -70,6 +80,7 @@ export class QueueService {
     async sendWebhook(payload: QueueWebhookPayload): Promise<QueueWebhookResponse> {
         const url = `${this.apiUrl}/api/queue/webhook`
         console.log(`[QueueService] Sending webhook: ${payload.event}`, payload)
+        if (GUARD_ENABLED) return viaGuard('/api/queue/webhook', { ...payload }) as Promise<QueueWebhookResponse>
 
         const response = await this.fetchWithRetry(url, {
             method: 'POST',
@@ -90,6 +101,9 @@ export class QueueService {
     async generateSessionToken(eventId: string, sessionId: string): Promise<QueueSessionTokenResponse> {
         const url = `${this.apiUrl}/api/queue/generate-session-token`
         console.log(`[QueueService] Generating session token for event=${eventId}, session=${sessionId}`)
+        if (GUARD_ENABLED) {
+            return viaGuard('/api/queue/generate-session-token', { event_id: eventId, session_id: sessionId }) as Promise<QueueSessionTokenResponse>
+        }
 
         const response = await this.fetchWithRetry(url, {
             method: 'POST',

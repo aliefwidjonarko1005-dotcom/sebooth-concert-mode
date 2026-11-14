@@ -8,7 +8,6 @@ import { startRoute } from './Tutorial'
 import { Hourglass } from '../components/CaptureArt/CaptureArt'
 import { useButtonHints } from '../components/ButtonRail/ButtonRail'
 
-const ADMIN_PASSWORD = 'admin123'
 const TICKET_TIMEOUT_SEC = 300 // 5 minutes
 const QR_DISPLAY_SEC = 60 // 60 seconds QR display
 
@@ -298,9 +297,11 @@ function QueueDisplay(): JSX.Element {
         setHoldProgress(0)
     }, [holdTimer])
 
-    const handleAdminSubmit = (e: React.FormEvent) => {
+    const handleAdminSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (adminPassword === ADMIN_PASSWORD) {
+        // Checked in main against the owner-set PIN hash (attempt-limited)
+        const res = await (window as any).api?.system?.verifyAdminPin?.(adminPassword).catch(() => null)
+        if (res?.data?.ok) {
             setShowAdminModal(false)
             setAdminPassword('')
             navigate('/admin')

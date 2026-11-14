@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useFrameStore, useAppConfig, useFilterStore, useSessionStore, useEventSessionStore } from '../stores'
 import { DEFAULT_VIEW_ZOOM, WIDE_VIEW_ZOOM, isWideView } from '@shared/viewZoom'
-import { AppConfig, FrameConfig, PhotoSlot, PrinterDevice, ChromaKeyConfig } from '@shared/types'
+import { AppConfig, ExposurePreset, FrameConfig, PhotoSlot, PrinterDevice, ChromaKeyConfig } from '@shared/types'
+import { CANON_ISO, CANON_SHUTTER, DEFAULT_EXPOSURE_PRESETS } from '@shared/canonExposure'
 import { v4 as uuidv4 } from 'uuid'
 import { apiHelper } from '../lib/apiHelper'
 import { getSessionHistory, SessionHistoryItem, getSupabase } from '../lib/supabase'
@@ -43,6 +44,7 @@ function AdminDashboard(): JSX.Element {
     const [historyPage, setHistoryPage] = useState(0)
     const [isLoadingHistory, setIsLoadingHistory] = useState(false)
     const [localIp, setLocalIp] = useState<string>('0.0.0.0')
+    const [lanKey, setLanKey] = useState<string>('')
     const [availablePrinters, setAvailablePrinters] = useState<PrinterDevice[]>([])
     const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([])
     const [isLoadingDevices, setIsLoadingDevices] = useState(false)
@@ -61,6 +63,16 @@ function AdminDashboard(): JSX.Element {
     const [wbValues, setWbValues] = useState<{ current: string; available: string[] }>({ current: '', available: [] })
     const [cameraSettingsLoading, setCameraSettingsLoading] = useState(false)
     const [captureTestResult, setCaptureTestResult] = useState<string | null>(null)
+    const [exposureStatus, setExposureStatus] = useState<string | null>(null)
+
+    const applyExposure = async (preset: ExposurePreset): Promise<void> => {
+        setExposureStatus('Memasang ke kamera...')
+        const iso = await window.api.camera.setProperty('iso', preset.iso)
+        const shutter = await window.api.camera.setProperty('shutterspeed', preset.shutter)
+        setExposureStatus(iso.data && shutter.data
+            ? `Terpasang: ISO ${preset.iso}, ${preset.shutter}`
+            : 'Gagal memasang. Pastikan kamera menyala, terhubung, dan dial di mode M.')
+    }
     const liveViewTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
     const canvasRef = useRef<HTMLDivElement>(null)
@@ -86,6 +98,8 @@ function AdminDashboard(): JSX.Element {
     const fetchIp = async () => {
         const result = await (window as any).api.system.getLocalIp()
         if (result.success && result.data) setLocalIp(result.data)
+        const key = await (window as any).api.system.getLanKey?.()
+        if (key?.success) setLanKey(key.data)
     }
 
     const fetchCloudQueue = async () => {
@@ -2119,6 +2133,54 @@ function AdminDashboard(): JSX.Element {
                         </div>
 
                         <div className={styles.timerCard}>
+                            <h3>Flipbook</h3>
+                            <p>Paket burst DSLR. 1 lembar 4R = 4 halaman (halaman 1 = cover). Potong tumpukan strip sekali di tengah, taruh bagian bawah di belakang.</p>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={config.flipbookEnabled || false}
+                                    onChange={(e) => updateConfig({ flipbookEnabled: e.target.checked })}
+                                />
+                                {config.flipbookEnabled ? 'Paket Flipbook aktif' : 'Paket Flipbook nonaktif'}
+                            </label>
+                            {config.flipbookEnabled && (
+                                <div style={{ display: 'grid', gap: '10px' }}>
+                                    <div className={styles.timerInput}>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="1000"
+                                            value={config.flipbookPrice ?? 50000}
+                                            onChange={(e) => updateConfig({ flipbookPrice: parseInt(e.target.value) || 0 })}
+                                            style={{ width: '120px', padding: '8px', fontSize: '16px', borderRadius: '8px', border: '1px solid var(--color-border)' }}
+                                        />
+                                        <span className={styles.timerValue}>Rp {(config.flipbookPrice ?? 50000).toLocaleString('id-ID')}</span>
+                                    </div>
+                                    <div className={styles.timerInput}>
+                                        <input
+                                            type="range"
+                                            min="1"
+                                            max="15"
+                                            value={config.flipbookSheets ?? 6}
+                                            onChange={(e) => updateConfig({ flipbookSheets: Number(e.target.value) })}
+                                        />
+                                        <span className={styles.timerValue}>{config.flipbookSheets ?? 6} lembar = {(config.flipbookSheets ?? 6) * 4} halaman</span>
+                                    </div>
+                                    <div className={styles.timerInput}>
+                                        <input
+                                            type="range"
+                                            min="2"
+                                            max="15"
+                                            value={config.flipbookDurationSec ?? 4}
+                                            onChange={(e) => updateConfig({ flipbookDurationSec: Number(e.target.value) })}
+                                        />
+                                        <span className={styles.timerValue}>Burst {config.flipbookDurationSec ?? 4} dtk</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className={styles.timerCard}>
                             <h3>Payment Timeout</h3>
                             <p>Time limit for payment (seconds)</p>
                             <div className={styles.timerInput}>
@@ -2443,7 +2505,7 @@ function AdminDashboard(): JSX.Element {
                                             textAlign: 'center',
                                             userSelect: 'all'
                                         }}>
-                                            http://{localIp}:5050/monitor
+                                            http://{localIp}:5050/monitor?k={lanKey}
                                         </div>
                                     </div>
                                 )}
@@ -2635,6 +2697,55 @@ function AdminDashboard(): JSX.Element {
                                             {captureTestResult}
                                         </div>
                                     )}
+
+                                    <div style={{ marginTop: '12px', padding: '14px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                                        <h4 style={{ margin: 0, color: '#e5e7eb' }}>Eksposur kamera</h4>
+                                        <p style={{ margin: '4px 0 10px', fontSize: '12px', color: '#9ca3af' }}>
+                                            Template memasang ISO dan shutter dari program, juga setiap kamera tersambung. Dial kamera harus di mode M. Aperture tetap diatur dari kamera.
+                                        </p>
+                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                                            {(['manual', 'indoor', 'outdoor'] as const).map(name => (
+                                                <button
+                                                    key={name}
+                                                    onClick={() => {
+                                                        updateConfig({ exposurePreset: name })
+                                                        if (name === 'manual') setExposureStatus('Mengikuti pengaturan di kamera.')
+                                                        else applyExposure(config.exposurePresets?.[name] ?? DEFAULT_EXPOSURE_PRESETS[name])
+                                                    }}
+                                                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', color: 'white', background: (config.exposurePreset ?? 'manual') === name ? '#fe6b00' : '#374151' }}
+                                                >
+                                                    {name === 'manual' ? 'Dari kamera' : name === 'indoor' ? 'Indoor' : 'Outdoor'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {(config.exposurePreset === 'indoor' || config.exposurePreset === 'outdoor') && (() => {
+                                            const name = config.exposurePreset
+                                            const presets = config.exposurePresets ?? DEFAULT_EXPOSURE_PRESETS
+                                            const current = presets[name] ?? DEFAULT_EXPOSURE_PRESETS[name]
+                                            const change = (next: ExposurePreset) => {
+                                                updateConfig({ exposurePresets: { ...DEFAULT_EXPOSURE_PRESETS, ...presets, [name]: next } })
+                                                applyExposure(next)
+                                            }
+                                            const selectStyle = { width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', background: '#1a1a2e', color: 'white', fontSize: '13px' }
+                                            return (
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                    <label style={{ fontSize: '12px', color: '#d4d4d8' }}>
+                                                        ISO
+                                                        <select style={selectStyle} value={current.iso} onChange={(e) => change({ ...current, iso: e.target.value })}>
+                                                            {Object.keys(CANON_ISO).map(v => <option key={v} value={v}>{v}</option>)}
+                                                        </select>
+                                                    </label>
+                                                    <label style={{ fontSize: '12px', color: '#d4d4d8' }}>
+                                                        Shutter speed
+                                                        <select style={selectStyle} value={current.shutter} onChange={(e) => change({ ...current, shutter: e.target.value })}>
+                                                            {Object.keys(CANON_SHUTTER).map(v => <option key={v} value={v}>{v}</option>)}
+                                                        </select>
+                                                    </label>
+                                                </div>
+                                            )
+                                        })()}
+                                        {exposureStatus && <p style={{ margin: '10px 0 0', fontSize: '12px', color: '#d4d4d8' }}>{exposureStatus}</p>}
+                                    </div>
 
                                     <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(245,158,11,0.08)', borderRadius: '8px', fontSize: '12px', color: '#d4d4d8' }}>
                                         <strong style={{ color: '#fbbf24' }}>ℹ️ Tips:</strong>
@@ -3325,6 +3436,12 @@ function AdminDashboard(): JSX.Element {
                                     </div>
                                     <div style={{ marginTop: '8px', fontSize: '12px', color: '#6b7280' }}>
                                         Pastikan kedua device terhubung di jaringan WiFi/LAN yang sama
+                                    </div>
+                                    <div style={{ marginTop: '12px', fontSize: '13px', color: '#9ca3af' }}>
+                                        Loket dari HP staf (link ini berisi kunci LAN, jangan disebar):
+                                    </div>
+                                    <div style={{ marginTop: '6px', padding: '10px 14px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', fontFamily: 'monospace', fontSize: '14px', color: '#ffa366', userSelect: 'all', wordBreak: 'break-all' }}>
+                                        http://{localIp || '?.?.?.?'}:5050/?k={lanKey}#/loket
                                     </div>
                                 </div>
                             )}

@@ -152,6 +152,22 @@
     justify-content: center;
 }
 
+/* Flipbook burst: camera stays visible, one banner at the bottom */
+.burstBanner {
+    position: absolute;
+    left: 50%;
+    bottom: 6%;
+    transform: translateX(-50%);
+    z-index: 30;
+    padding: 10px 28px;
+    border: var(--ink-line);
+    border-radius: 999px;
+    background: var(--brand-sun);
+    color: var(--brand-ink);
+    font-size: clamp(28px, 5vh, 56px);
+    white-space: nowrap;
+}
+
 /* Preview */
 .previewOverlay {
     position: absolute;

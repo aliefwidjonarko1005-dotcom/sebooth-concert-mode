@@ -9,6 +9,7 @@ import PaymentGateway from './pages/PaymentGateway'
 import CaptureSession from './pages/CaptureSession'
 import PhotoReviewPage from './pages/PhotoReviewPage'
 import FinalizePage from './pages/FinalizePage'
+import FlipbookPage from './pages/FlipbookPage'
 import PickupCounter from './pages/PickupCounter'
 import ReviewSession from './pages/ReviewSession'
 import OutputPage from './pages/OutputPage'
@@ -21,15 +22,17 @@ import { ButtonRail } from './components/ButtonRail/ButtonRail'
 import { CartoonBackdrop } from './components/CaptureArt/CaptureArt'
 import { GuideTransition } from './components/GuideTransition/GuideTransition'
 import { MascotAssistant } from './components/GuideTransition/MascotAssistant'
+import { LockScreen, useGuardView } from './components/LockScreen/LockScreen'
 
 // Operator / back-office screens keep their own look (no cartoon stage)
 const NO_ART_ROUTES = ['/admin', '/loket', '/gallery']
 // Portrait pages whose bottom-left holds buttons or the preview: the corner mascot would sit under them
-const PORTRAIT_BUSY_ROUTES = ['/tutorial', '/payment', '/capture', '/photo-review', '/review', '/output', '/finalize']
+const PORTRAIT_BUSY_ROUTES = ['/tutorial', '/payment', '/capture', '/photo-review', '/review', '/output', '/finalize', '/flipbook']
 
 function App(): JSX.Element {
     const { config } = useAppConfig()
     const location = useLocation()
+    const guard = useGuardView()
     const showArt = !NO_ART_ROUTES.some((r) => location.pathname.startsWith(r))
     // Tappable helper mascot: touch booth only, opt-in from Admin, never on the homepage
     const assistantOn = showArt && config.appOrientation !== 'portrait' && !!config.mascotAssistant && location.pathname !== '/'
@@ -71,6 +74,9 @@ function App(): JSX.Element {
         }
     }
 
+    // Booth Guard lockdown replaces every route and the button rail (main refuses IPC meanwhile anyway)
+    if (guard?.locked) return <LockScreen view={guard} />
+
     return (
         <>
             {showArt && (
@@ -93,6 +99,7 @@ function App(): JSX.Element {
                     <Route path="/capture" element={<CaptureSession />} />
                     <Route path="/photo-review" element={<PhotoReviewPage />} />
                     <Route path="/finalize" element={<FinalizePage />} />
+                    <Route path="/flipbook" element={<FlipbookPage />} />
                     <Route path="/loket" element={<PickupCounter />} />
                     <Route path="/review" element={<ReviewSession />} />
                     <Route path="/output" element={<OutputPage />} />

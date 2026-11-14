@@ -7,6 +7,8 @@ import sharp from 'sharp'
 import ffmpeg from 'fluent-ffmpeg'
 import { getFFmpegPath } from '../lib/paths'
 import { getLocalIpAddress } from '../server'
+import { getLanKey } from '../lib/lanKey'
+import { verifyAdminPin } from '../lib/adminPin'
 import { enqueueSessionUpload, isCloudUploadReady } from './cloud.ipc'
 
 ffmpeg.setFfmpegPath(getFFmpegPath())
@@ -734,6 +736,15 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
             }
         })
         return { success: true }
+    })
+
+    // LAN server key, for the phone/monitor links shown in Admin
+    ipcMain.handle('system:get-lan-key', async (): Promise<APIResponse<string>> => {
+        return { success: true, data: await getLanKey() }
+    })
+
+    ipcMain.handle('system:verify-admin-pin', async (_, pin: string): Promise<APIResponse<{ ok: boolean; retryInSec?: number }>> => {
+        return { success: true, data: await verifyAdminPin(String(pin || '')) }
     })
 
     // Get local machine IP address for local offline sharing

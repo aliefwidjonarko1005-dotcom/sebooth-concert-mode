@@ -87,6 +87,11 @@ const defaultConfig: AppConfig = {
     concertPrintQuantity: 2,
     boothCode: 'B1',
     concertCounter: 0,
+    exposurePreset: 'manual',
+    flipbookEnabled: false,
+    flipbookPrice: 50000,
+    flipbookSheets: 6,
+    flipbookDurationSec: 4,
     buttonRailEnabled: true,
     landingArt: { enabled: true, style: 'aurora', colors: ['#ff4500', '#fe6b00', '#5b8cff'], opacity: 0.85, liveOpacity: 0.35, speed: 1 },
     buttonRailPositions: [22, 50, 78],
@@ -419,7 +424,7 @@ export const useFrameStore = create<FrameState>()(
 interface SessionState {
     currentSession: SessionData | null
     photos: CapturedPhoto[]
-    startSession: (frameId: string, printQuantity?: number) => void
+    startSession: (frameId: string, printQuantity?: number, flipbook?: boolean) => void
     endSession: () => void
     setPrintQuantity: (quantity: number) => void
     addPhoto: (slotId: string, imagePath: string, videoPath?: string) => void
@@ -445,13 +450,14 @@ export const useSessionStore = create<SessionState>((set) => ({
     currentSession: null,
     photos: [],
 
-    startSession: (frameId, printQuantity) => set({
+    startSession: (frameId, printQuantity, flipbook) => set({
         currentSession: {
             id: uuidv4(),
             frameId,
             photos: [],
             createdAt: Date.now(),
-            printQuantity: printQuantity || 2
+            printQuantity: printQuantity || 2,
+            flipbook: flipbook || undefined
         },
         photos: []
     }),

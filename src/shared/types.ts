@@ -24,6 +24,11 @@ export interface CameraSettings {
     whiteBalance?: string
 }
 
+export interface ExposurePreset {
+    iso: string     // label from CANON_ISO, e.g. '3200'
+    shutter: string // label from CANON_SHUTTER, e.g. '1/100'
+}
+
 export interface CameraPropertyValues {
     current: string
     available: string[]
@@ -113,6 +118,7 @@ export interface SessionData {
     compositePath?: string
     cloudSessionId?: string
     printQuantity?: number // Paid print quantity (number of photo strips)
+    flipbook?: boolean // Flipbook package: burst capture, printed as config.flipbookSheets sheets
 }
 
 export interface SetupConfig {
@@ -218,6 +224,10 @@ export interface AppConfig {
     queueWebhookSecret: string // Shared secret for webhook auth
     queueApiUrl: string // Base URL of the website (e.g. https://www.sebooth.in)
 
+    // Admin PIN, set by the owner through Booth Guard (set_config). Empty = legacy PIN 123.
+    adminPinHash?: string // pbkdf2$<iterations>$<salt b64>$<hash b64>, PBKDF2-SHA256
+    adminPinLength?: number // digits entered with the 1/2/3 buttons
+
     // Layout Settings
     appOrientation: 'landscape' | 'portrait' // Screen/App layout orientation
     cameraRotation?: 0 | 90 | 180 | 270 // Camera physical tilt/rotation angle (0, 90, 180, 270 deg)
@@ -241,6 +251,16 @@ export interface AppConfig {
     concertPrintQuantity?: number  // fixed strips per session (default 2 = 1 sheet)
     boothCode?: string             // short code printed on pickup label, e.g. 'B2'
     concertCounter?: number        // last used session number on this booth
+
+    // Canon EDSDK exposure template, applied on connect. 'manual' (default) leaves the camera as set on its dials.
+    exposurePreset?: 'manual' | 'indoor' | 'outdoor'
+    exposurePresets?: Record<'indoor' | 'outdoor', ExposurePreset>
+
+    // Flipbook package: DSLR burst → pages printed 4 per 4R sheet (DNP 2-inch cut), stacked by one horizontal cut
+    flipbookEnabled?: boolean
+    flipbookPrice?: number
+    flipbookSheets?: number        // 4R sheets per flipbook (4 pages each, page 1 = cover)
+    flipbookDurationSec?: number   // burst length
 
     // Abstract 2D gradient animation on the homepage (also overlays the live camera background)
     landingArt?: AmbientArtSettings

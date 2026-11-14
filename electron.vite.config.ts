@@ -1,10 +1,12 @@
 import { resolve } from 'path'
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { bytecodePlugin, defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
     main: {
-        plugins: [externalizeDepsPlugin()],
+        // bytecodePlugin: production main/preload ship as V8 bytecode (Booth Guard logic lives in main).
+        // It only runs for `electron-vite build`; dev keeps plain JS.
+        plugins: [externalizeDepsPlugin(), bytecodePlugin()],
         resolve: {
             alias: {
                 '@shared': resolve('src/shared')
@@ -12,7 +14,7 @@ export default defineConfig({
         }
     },
     preload: {
-        plugins: [externalizeDepsPlugin()],
+        plugins: [externalizeDepsPlugin(), bytecodePlugin()],
         resolve: {
             alias: {
                 '@shared': resolve('src/shared')

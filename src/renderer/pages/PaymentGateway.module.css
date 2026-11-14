@@ -126,6 +126,28 @@
     text-align: center;
 }
 
+.packageSwitch {
+    display: flex;
+    gap: 10px;
+    margin: 8px 0;
+}
+
+.packageSwitch button {
+    flex: 1;
+    padding: 12px 8px;
+    border-radius: 14px;
+    border: var(--ink-line);
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    font-size: 18px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.packageSwitch .packageActive {
+    background: var(--brand-sun);
+}
+
 .printSelectorTitle {
     font-size: 22px;
     font-weight: 700;

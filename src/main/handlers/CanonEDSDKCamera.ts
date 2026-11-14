@@ -7,9 +7,11 @@ import { getFFmpegPath } from '../lib/paths'
 
 ffmpeg.setFfmpegPath(getFFmpegPath())
 import { dirname, join } from 'path'
+import { mkdir, readdir } from 'fs/promises'
 import { app } from 'electron'
 import { CameraHandler } from './CameraHandler'
 import { CameraDevice, CaptureResult } from '@shared/types'
+import { CANON_ISO, CANON_SHUTTER, DEFAULT_EXPOSURE_PRESETS } from '@shared/canonExposure'
 import { configService } from '../services/ConfigService'
 
 const execAsync = promisify(exec)
@@ -42,6 +44,7 @@ export class CanonEDSDKCamera extends CameraHandler {
     private detectedCameraName: string = ''
     private helperProcess: ChildProcess | null = null
     private connectPromise: Promise<boolean> | null = null
+    private scanPromise: Promise<CameraDevice[]> | null = null
     private isShutdown = false
     private recovering = false
     private keepAliveTimer: NodeJS.Timeout | null = null
@@ -134,14 +137,17 @@ export class CanonEDSDKCamera extends CameraHandler {
             'CanonHelper.exe'
         ]
 
-        for (const appName of appsToKill) {
-            try {
-                await execAsync(`taskkill /f /im "${appName}"`, { timeout: 3000 })
-                console.log(`[CanonEDSDK] Killed ${appName}`)
-                await new Promise(resolve => setTimeout(resolve, 500))
-            } catch {
-                // App not running — ignore
-            }
+        // One taskkill for all names (was 11 sequential spawns on every connect). It exits non-zero
+        // when some names aren't running, so read stdout from the error too.
+        let killed = ''
+        try {
+            killed = (await execAsync(`taskkill /f ${appsToKill.map(a => `/im "${a}"`).join(' ')}`, { timeout: 5000 })).stdout
+        } catch (e: any) {
+            killed = e?.stdout || ''
+        }
+        if (/SUCCESS/i.test(killed)) {
+            console.log(`[CanonEDSDK] Killed conflicting apps: ${killed.trim()}`)
+            await new Promise(resolve => setTimeout(resolve, 500))
         }
 
         try {
@@ -227,6 +233,10 @@ try {
      * to avoid opening a second EDSDK session that would lock the COM port.
      */
     async listCameras(): Promise<CameraDevice[]> {
+        // The scan opens its own EDSDK session: overlapping the helper's connect makes one of them
+        // fail with "Comm Port Is In Use". Wait out a connect, share a running scan.
+        if (this.connectPromise) await this.connectPromise.catch(() => {})
+
         // If the helper is already running and connected, return cached info
         // to avoid COM port conflicts from multiple EDSDK sessions
         if (this.connected && this.helperProcess && this.currentCamera) {
@@ -234,6 +244,13 @@ try {
             return [this.currentCamera]
         }
 
+        if (!this.scanPromise) {
+            this.scanPromise = this.scanCameras().finally(() => { this.scanPromise = null })
+        }
+        return this.scanPromise
+    }
+
+    private async scanCameras(): Promise<CameraDevice[]> {
         console.log('[CanonEDSDK] Scanning for Canon cameras...')
 
         // Verify DLLs exist
@@ -355,6 +372,8 @@ try {
     private async connectInternal(cameraId: string): Promise<boolean> {
         console.log(`[CanonEDSDK] Connecting to camera: ${cameraId}`)
 
+        if (this.scanPromise) await this.scanPromise.catch(() => {})
+
         if (this.connected && this.helperProcess) {
             console.log('[CanonEDSDK] Camera already connected and helper is running, reusing session')
             return true
@@ -428,6 +447,7 @@ try {
                             }
                             isResolved = true
                             this.startKeepAlive()
+                            this.applyExposurePreset().catch(e => console.warn('[CanonEDSDK] Exposure preset failed:', e.message))
                             resolve(true)
                         } else if (line.startsWith('ERROR:')) {
                             const err = line.substring(6).trim()
@@ -654,15 +674,87 @@ try {
         }
     }
 
+    /** Flipbook burst: helper holds the shutter for `durationMs` and writes burst-000.jpg... into outDir. */
+    async burst(durationMs: number, outDir: string): Promise<string[]> {
+        if (!this.helperProcess) {
+            try { await this.connect('canon_edsdk_0') } catch (e: any) {
+                console.warn('[CanonEDSDK] Auto-connect before burst failed:', e.message)
+            }
+        }
+        const helper = this.helperProcess
+        if (!helper) throw new Error('Canon EDSDK: Helper process is not connected')
+        await mkdir(outDir, { recursive: true })
+
+        await new Promise<void>((resolve, reject) => {
+            const stdoutListener = (data: Buffer) => {
+                for (const line of data.toString().split('\n')) {
+                    const trimmed = line.trim()
+                    if (trimmed.startsWith('BURST_DONE:')) { cleanup(); resolve() }
+                    else if (trimmed.startsWith('ERROR:')) { cleanup(); reject(new Error(trimmed.substring(6).trim())) }
+                }
+            }
+            // hold time + buffer flush (helper waits up to 30 s) + download
+            const timer = setTimeout(() => { cleanup(); reject(new Error('Burst timeout waiting for C# helper')) }, durationMs + 90000)
+            const cleanup = () => { clearTimeout(timer); helper.stdout?.removeListener('data', stdoutListener) }
+            helper.stdout?.on('data', stdoutListener)
+            helper.stdin?.write(`BURST ${Math.round(durationMs)} ${outDir}\n`)
+        })
+
+        return (await readdir(outDir)).filter(f => /^burst-\d+\.jpg$/i.test(f)).sort().map(f => join(outDir, f))
+    }
+
     // ══════════════════════════════════════════════════════════
     // Camera Settings API
     // ══════════════════════════════════════════════════════════
+
+    /** ISO/shutter by label ('3200', '1/100') through the running helper. False if the body refuses (e.g. dial not on M). */
+    private setExposureProp(property: 'iso' | 'shutterspeed', label: string): Promise<boolean> {
+        const code = (property === 'iso' ? CANON_ISO : CANON_SHUTTER)[label]
+        const helper = this.helperProcess
+        if (code === undefined || !helper || !this.connected) return Promise.resolve(false)
+        const name = property === 'iso' ? 'iso' : 'tv'
+
+        return new Promise<boolean>((resolve) => {
+            const finish = (ok: boolean) => {
+                clearTimeout(timer)
+                helper.stdout?.removeListener('data', stdoutListener)
+                resolve(ok)
+            }
+            const stdoutListener = (data: Buffer) => {
+                const text = data.toString()
+                if (text.includes(`STATUS:PROP_OK:${name}`)) finish(true)
+                else if (text.includes(`WARNING:PROP_FAIL:${name}`)) {
+                    console.warn(`[CanonEDSDK] ${text.trim()}`)
+                    finish(false)
+                }
+            }
+            const timer = setTimeout(() => finish(false), 5000)
+            helper.stdout?.on('data', stdoutListener)
+            helper.stdin?.write(`SET_PROP ${name} ${code}\n`)
+        })
+    }
+
+    private async applyExposurePreset(): Promise<void> {
+        const { exposurePreset, exposurePresets } = configService.getConfig()
+        if (exposurePreset !== 'indoor' && exposurePreset !== 'outdoor') return
+        const preset = exposurePresets?.[exposurePreset] ?? DEFAULT_EXPOSURE_PRESETS[exposurePreset]
+        const iso = await this.setExposureProp('iso', preset.iso)
+        const shutter = await this.setExposureProp('shutterspeed', preset.shutter)
+        console.log(`[CanonEDSDK] Exposure ${exposurePreset}: ISO ${preset.iso} ${iso ? 'ok' : 'FAILED'}, ${preset.shutter} ${shutter ? 'ok' : 'FAILED'}`)
+    }
 
     /**
      * Set a camera property (iso, shutterspeed, aperture, etc.)
      * EDSDK uses its own property enums — we map common names
      */
     async setProperty(property: string, value: string): Promise<boolean> {
+        // Aspect goes through the running helper: a second EDSDK session would lock the camera.
+        if (property === 'aspect') {
+            if (!this.helperProcess || !this.connected) return false
+            this.helperProcess.stdin?.write(`SET_ASPECT ${parseInt(value, 10)}\n`)
+            return true
+        }
+        if (property === 'iso' || property === 'shutterspeed') return this.setExposureProp(property, value)
         try {
             const result = await this.runPowerShell(`
 ${this.getEdsdkPreamble()}

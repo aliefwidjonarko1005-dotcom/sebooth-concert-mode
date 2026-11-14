@@ -47,6 +47,11 @@ let isCapturingActive = false
 /**
  * Switch camera handler implementation
  */
+/** For the Booth Guard heartbeat; never throws. */
+export function cameraConnected(): boolean {
+    try { return cameraHandler.isConnected() } catch { return false }
+}
+
 export function setCameraHandler(handler: CameraHandler): void {
     cameraHandler = handler
 }
@@ -128,6 +133,33 @@ export function registerCameraHandlers(ipcMain: IpcMain): void {
             const elapsedMs = Date.now() - captureStartTime
             const err = error as Error
             console.error(`[Camera IPC] ❌ CAPTURE ERROR after ${elapsedMs}ms:`, err.message)
+            return { success: false, error: err.message }
+        } finally {
+            isCapturingActive = false
+        }
+    })
+
+    // Flipbook burst: returns frame paths in shot order. Canon holds the shutter in continuous drive;
+    // other handlers fall back to back-to-back single captures for the same duration.
+    ipcMain.handle('camera:burst', async (_, durationMs: number): Promise<APIResponse<string[]>> => {
+        if (isCapturingActive) return { success: false, error: 'A capture is already in progress' }
+        isCapturingActive = true
+        const outDir = join(getTempPath(), `burst_${Date.now()}`)
+        try {
+            if (cameraHandler instanceof CanonEDSDKCamera) {
+                return { success: true, data: await cameraHandler.burst(durationMs, outDir) }
+            }
+            const frames: string[] = []
+            const end = Date.now() + durationMs
+            while (Date.now() < end || frames.length < 2) {
+                const res: CaptureResult = await (cameraHandler as any).capture(join(outDir, `burst-${String(frames.length).padStart(3, '0')}.jpg`))
+                if (!res.success || !res.imagePath) throw new Error(res.error || 'Capture failed')
+                frames.push(res.imagePath)
+            }
+            return { success: true, data: frames }
+        } catch (error) {
+            const err = error as Error
+            console.error('[Camera IPC] Burst failed:', err.message)
             return { success: false, error: err.message }
         } finally {
             isCapturingActive = false

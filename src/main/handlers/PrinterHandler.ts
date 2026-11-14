@@ -117,7 +117,12 @@ public class ImagePrinter {
         // We handle the rotation ourselves (Rotate90FlipNone), so tell Windows this is Portrait
         // to prevent Auto-Rotate interference.
         pd.DefaultPageSettings.Landscape = false;
-        
+
+        // A fresh DS-RX1 driver defaults to plain (6x4), which never cuts: pick the 2-inch cut size when the driver has it.
+        foreach (PaperSize size in pd.PrinterSettings.PaperSizes) {
+            if (size.PaperName == "(6x4) x 2") { pd.DefaultPageSettings.PaperSize = size; break; }
+        }
+
         pd.PrintPage += (sender, args) => {
             using (Image img = Image.FromFile(file)) {
                 // To trigger the 2-inch split cut on DNP RX1 and similar dye-sub printers,
