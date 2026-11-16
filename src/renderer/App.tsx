@@ -51,6 +51,7 @@ function App(): JSX.Element {
         const initCamera = async () => {
             try {
                 const windowApi = (window as any).api
+                if (!windowApi) return // remote browser on :5050: no camera here
                 if (config.cameraMode === 'mock') {
                     await windowApi.camera.useMock()
                 } else if (config.cameraMode === 'ptp') {

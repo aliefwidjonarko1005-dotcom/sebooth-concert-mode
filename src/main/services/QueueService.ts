@@ -122,6 +122,7 @@ export class QueueService {
     async operatorAction(eventId: string, action: 'call_next' | 'cancel_ticket', ticketId?: string): Promise<any> {
         const url = `${this.apiUrl}/api/queue/operator/action`
         console.log(`[QueueService] Operator action: ${action} for event=${eventId}`)
+        if (GUARD_ENABLED) return viaGuard('/api/queue/operator/action', { eventId, action, ticketId })
 
         const response = await this.fetchWithRetry(url, {
             method: 'POST',

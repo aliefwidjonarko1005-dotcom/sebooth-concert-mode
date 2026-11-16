@@ -30,6 +30,28 @@
         "--remote-debugging-port=9222"
       ],
       "port": 5050
+    },
+    {
+      "name": "sebooth-web-start",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "../06 Sebooth Proposal Company Profile/sebooth-website",
+        "run",
+        "start"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "sebooth-web-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "../06 Sebooth Proposal Company Profile/sebooth-website",
+        "run",
+        "dev"
+      ],
+      "port": 3000
     }
   ]
 }

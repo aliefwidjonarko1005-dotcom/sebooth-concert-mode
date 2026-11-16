@@ -2,6 +2,9 @@ import { join } from 'path'
 import { existsSync, mkdirSync, copyFileSync } from 'fs'
 import { CameraHandler } from './CameraHandler'
 import { CameraDevice, CaptureResult } from '@shared/types'
+import sharp from 'sharp'
+
+const MOCK_COLOURS: [number, number, number][] = [[29, 67, 196], [254, 107, 0], [255, 200, 40], [40, 160, 110], [200, 60, 90]]
 
 /**
  * Mock Camera Handler for Development/Testing
@@ -76,11 +79,13 @@ export class MockCamera extends CameraHandler {
             if (this.mockImagePath && existsSync(this.mockImagePath)) {
                 copyFileSync(this.mockImagePath, outputPath)
             } else {
-                // Write a tiny 1x1 valid JPEG to prevent broken image icons
-                const dummyJpegBase64 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA='
-                const buffer = Buffer.from(dummyJpegBase64, 'base64')
-                require('fs').writeFileSync(outputPath, buffer)
-                console.log(`[MockCamera] Captured dummy image to: ${outputPath}`)
+                // A real baseline JPEG (sharp rejects malformed ones, e.g. when building flipbook sheets),
+                // in a colour that changes per shot so strip/flipbook previews visibly differ
+                const [r, g, b] = MOCK_COLOURS[this.captureCount % MOCK_COLOURS.length]
+                await sharp({ create: { width: 1500, height: 1000, channels: 3, background: { r, g, b } } })
+                    .jpeg({ quality: 80 })
+                    .toFile(outputPath)
+                console.log(`[MockCamera] Captured test image to: ${outputPath}`)
             }
 
             this.captureCount++

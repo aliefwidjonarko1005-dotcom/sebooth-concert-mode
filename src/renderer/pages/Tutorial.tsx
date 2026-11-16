@@ -167,10 +167,10 @@ function Tutorial(): JSX.Element {
             {touch && (
                 <div className={styles.topActions}>
                     <button type="button" className={styles.backBtn} onClick={() => setIsConfirmModalOpen(true)}>
-                        ← Kembali
+                        Kembali
                     </button>
                     <button type="button" className={styles.skipBtn} onClick={goOn}>
-                        Lewati Tutorial ➔
+                        Lewati Tutorial
                     </button>
                 </div>
             )}

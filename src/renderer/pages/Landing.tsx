@@ -62,10 +62,12 @@ function Landing(): JSX.Element {
             navigate('/admin')
             return
         }
+        // Wrong PIN closes the modal: on a button-only booth there is no other way out of it
         setPasswordError(true)
         setTimeout(() => {
             setPasswordError(false)
             setPinSequence('')
+            setShowAdminModal(false)
         }, 1000)
     }, [navigate])
 
@@ -174,7 +176,8 @@ function Landing(): JSX.Element {
 
                     // Force play the video
                     videoRef.current.play().catch(e => {
-                        console.error('[Landing] Video play error:', e)
+                        // AbortError = a newer load superseded this play() call; the video still plays
+                        if ((e as DOMException)?.name !== 'AbortError') console.error('[Landing] Video play error:', e)
                     })
                 }
 
@@ -246,7 +249,8 @@ function Landing(): JSX.Element {
         updateConfig({ digitalZoom: toggleViewZoom(config.digitalZoom) })
     }, [config.digitalZoom, updateConfig])
 
-    // Keydown & Keyup listener for 5-second Key 1 Hold and Sequential PIN 123
+    // Keydown & Keyup listener for 5-second Key 1 Hold and the sequential admin PIN (buttons 1/2/3).
+    // The PIN input must not autofocus: focused, it swallows the button presses below.
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
@@ -557,12 +561,12 @@ function Landing(): JSX.Element {
                         >
                             <h3>Akses Admin</h3>
                             <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px', textAlign: 'center' }}>
-                                Tekan tombol <b>1 → 2 → 3</b> secara berurutan
+                                Masukkan PIN admin dengan tombol 1, 2 dan 3
                             </p>
 
                             {/* Sequential PIN Dots Indicator */}
                             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '20px' }}>
-                                {[0, 1, 2].map((i) => (
+                                {Array.from({ length: config.adminPinLength || 3 }, (_, i) => i).map((i) => (
                                     <div
                                         key={i}
                                         style={{
@@ -580,11 +584,10 @@ function Landing(): JSX.Element {
                             <form onSubmit={handleAdminSubmit}>
                                 <input
                                     type="password"
-                                    placeholder="Atau ketik PIN 123"
+                                    placeholder="Atau ketik PIN"
                                     value={adminPassword || pinSequence}
                                     onChange={e => setAdminPassword(e.target.value)}
                                     className={`${styles.passwordInput} ${passwordError ? styles.error : ''}`}
-                                    autoFocus
                                 />
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
                                     <button

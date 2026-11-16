@@ -151,15 +151,6 @@ const api = {
         copyFile: (source: string, destination: string): Promise<APIResponse<string>> =>
             ipcRenderer.invoke('system:copy-file', source, destination),
 
-        readJson: <T>(filePath: string): Promise<APIResponse<T>> =>
-            ipcRenderer.invoke('system:read-json', filePath),
-
-        writeJson: (filePath: string, data: unknown): Promise<APIResponse<void>> =>
-            ipcRenderer.invoke('system:write-json', filePath, data),
-
-        fileExists: (filePath: string): Promise<APIResponse<boolean>> =>
-            ipcRenderer.invoke('system:file-exists', filePath),
-
         readFileAsBase64: (filePath: string): Promise<APIResponse<string>> =>
             ipcRenderer.invoke('system:read-file-base64', filePath),
 

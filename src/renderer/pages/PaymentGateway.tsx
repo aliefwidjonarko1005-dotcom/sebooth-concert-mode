@@ -33,6 +33,7 @@ function PaymentGateway(): JSX.Element {
         expiredDatetime: null
     })
     const [isCreatingOrder, setIsCreatingOrder] = useState(false)
+    const [paymentError, setPaymentError] = useState<string | null>(null)
     const [pollInterval, setPollInterval] = useState<ReturnType<typeof setInterval> | null>(null)
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
 
@@ -152,8 +153,10 @@ function PaymentGateway(): JSX.Element {
             }
         } catch (err) {
             console.error('Payment error:', err)
+            // No alert(): a native dialog blocks the page and cannot be closed with the 1/2/3 buttons.
+            // The failed screen shows the reason and button 3 retries.
+            setPaymentError((err as Error).message || null)
             setPayment(prev => ({ ...prev, status: 'failed' }))
-            alert('Gagal membuat pembayaran: ' + (err as Error).message)
         } finally {
             setIsCreatingOrder(false)
         }
@@ -457,8 +460,8 @@ function PaymentGateway(): JSX.Element {
 
                             {payment.status === 'failed' && (
                                 <div className={styles.errorDisplay}>
-                                    <span>❌</span>
                                     <h3>Pembayaran Gagal</h3>
+                                    {paymentError && <p className={styles.errorReason}>{paymentError}</p>}
                                     <button onClick={() => setPayment({ status: 'idle', orderId: null, qrisUrl: null, qrString: null, transactionId: null, expiredDatetime: null })}>
                                         Coba Lagi
                                     </button>

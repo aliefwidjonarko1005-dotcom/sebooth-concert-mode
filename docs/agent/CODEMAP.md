@@ -42,6 +42,7 @@ Browser/iPad (remote admin) ──fetch──> main/server.ts (Express :5050) �
 | Global crash guard, bootstrap | `main/index.ts` |
 | Booth Guard (approval, lockdown, remote command, clone detection) | `main/guard/` (`client.ts` state machine, `protocol.ts`, `identity.ts`, `gate.ts`), pin `shared/guardPins.ts`, `renderer/components/LockScreen/`; panduan `docs/agent/BOOTH_GUARD.md` |
 | Kunci LAN :5050, PIN admin | `main/lib/lanKey.ts`, `main/lib/adminPin.ts` |
+| Batas path IPC file | `main/lib/safePath.ts` (dipakai system/image/printer/cloud/drive ipc) |
 | Fuses / bytecode build | `scripts/afterPack.cjs`, `electron.vite.config.ts` |
 | Update jarak jauh (rilis GCS) | `main/guard/updater.ts`, `scripts/publish-release.mjs`, `build.publish` di `package.json` |
 | Admin Dashboard | `renderer/pages/AdminDashboard.tsx` (3769 — **jangan baca utuh**; grep `activeTab === '<tab>'`) |
@@ -70,7 +71,7 @@ Komponen: `ConfirmBackHomeModal`, `EmailModal`, `PrintQuantityModal`, `QRCodeMod
 
 ## IPC (`ns:action`)
 - **camera**: connect disconnect list status capture burst start-/stop-liveview get-liveview-url get-/set-property get-available-values start-/stop-recording-live-photo use-canon-edsdk use-direct-ptp use-mock use-real
-- **system**: finalize-session save-session-locally generate-hq-gif read-file-base64 save-data-url copy-file file-exists find-session-strip rename-session-folder read-/write-json open-file-dialog get-temp-path get-user-data-path get-local-ip
+- **system**: finalize-session save-session-locally generate-hq-gif read-file-base64 save-data-url copy-file find-session-strip rename-session-folder open-file-dialog get-temp-path get-user-data-path get-local-ip
 - **image**: composite apply-filter generate-gif flipbook-sheets resize metadata
 - **printer**: list default print print-with-options remote-print check-print-server get-queue get-history
 - **queue**: start-/stop-polling get-status generate-token send-session-started send-session-completed skip-ticket

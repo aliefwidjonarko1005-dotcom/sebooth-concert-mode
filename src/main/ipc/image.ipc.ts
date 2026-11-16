@@ -2,6 +2,7 @@ import { IpcMain } from 'electron'
 import { ImageProcessor } from '../services/ImageProcessor'
 import { buildFlipbookSheets } from '../services/FlipbookSheets'
 import { PhotoSlot, APIResponse } from '@shared/types'
+import { assertReadable, assertWritable } from '../lib/safePath'
 
 const imageProcessor = new ImageProcessor()
 
@@ -19,6 +20,9 @@ export function registerImageHandlers(ipcMain: IpcMain): void {
         canvasHeight: number
     }): Promise<APIResponse<string>> => {
         try {
+            for (const ph of options.photos) await assertReadable(ph.path)
+            await assertReadable(options.framePath)
+            await assertWritable(options.outputPath)
             const result = await imageProcessor.composite(
                 options.photos,
                 options.framePath,
@@ -42,6 +46,8 @@ export function registerImageHandlers(ipcMain: IpcMain): void {
         fit?: 'cover' | 'contain' | 'fill'
     }): Promise<APIResponse<string>> => {
         try {
+            await assertReadable(options.inputPath)
+            await assertWritable(options.outputPath)
             const result = await imageProcessor.resize(
                 options.inputPath,
                 options.outputPath,
@@ -69,6 +75,8 @@ export function registerImageHandlers(ipcMain: IpcMain): void {
         }
     }): Promise<APIResponse<string>> => {
         try {
+            await assertReadable(options.inputPath)
+            await assertWritable(options.outputPath)
             const result = await imageProcessor.applyFilter(
                 options.inputPath,
                 options.outputPath,
@@ -90,6 +98,8 @@ export function registerImageHandlers(ipcMain: IpcMain): void {
         height?: number
     }): Promise<APIResponse<string>> => {
         try {
+            for (const ip of options.imagePaths) await assertReadable(ip)
+            await assertWritable(options.outputPath)
             const result = await imageProcessor.generateGif(
                 options.imagePaths,
                 options.outputPath,
@@ -112,6 +122,9 @@ export function registerImageHandlers(ipcMain: IpcMain): void {
         outDir: string
     }): Promise<APIResponse<{ sheets: string[]; previews: string[] }>> => {
         try {
+            for (const ip of options.photoPaths) await assertReadable(ip)
+            if (options.coverPath) await assertReadable(options.coverPath)
+            await assertWritable(options.outDir)
             return { success: true, data: await buildFlipbookSheets(options) }
         } catch (error) {
             const err = error as Error
@@ -126,6 +139,7 @@ export function registerImageHandlers(ipcMain: IpcMain): void {
         format: string
     }>> => {
         try {
+            await assertReadable(imagePath)
             const result = await imageProcessor.getMetadata(imagePath)
             return { success: true, data: result }
         } catch (error) {
