@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import QRCode from 'react-qr-code'
 import { useAppConfig, useQueueStore, useFrameStore, useSessionStore } from '../stores'
 import styles from './QueueDisplay.module.css'
+
+const ADMIN_PASSWORD = 'admin123'
 import { startRoute } from './Tutorial'
 import { Hourglass } from '../components/CaptureArt/CaptureArt'
 import { useButtonHints } from '../components/ButtonRail/ButtonRail'
 
-const ADMIN_PASSWORD = 'admin123'
 const TICKET_TIMEOUT_SEC = 300 // 5 minutes
 const QR_DISPLAY_SEC = 60 // 60 seconds QR display
 
@@ -34,7 +35,8 @@ function QueueDisplay(): JSX.Element {
     const [adminPassword, setAdminPassword] = useState('')
     const [passwordError, setPasswordError] = useState(false)
     const [holdProgress, setHoldProgress] = useState(0)
-    const [holdTimer, setHoldTimer] = useState<any | null>(null)
+    const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+    const [pinSequence, setPinSequence] = useState('')
 
     // Called state
     const [ticketTimeRemaining, setTicketTimeRemaining] = useState(TICKET_TIMEOUT_SEC)
@@ -252,63 +254,84 @@ function QueueDisplay(): JSX.Element {
 
     useButtonHints({ 3: { label: showQR ? 'Lanjut' : 'Mulai sesi', primary: true, onScreen: true } })
 
-    // Keyboard navigation
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-
-            if (showQR) {
-                if (e.key === '1' || e.key === '2' || e.key === '3') {
-                    e.preventDefault()
-                    handleQRDismiss()
-                }
-            } else {
-                if (e.key === '1' || e.key === '2' || e.key === '3') {
-                    e.preventDefault()
-                    if (isCalled) {
-                        handleStartSession()
-                    } else {
-                        handleFallbackStart()
-                    }
-                }
-            }
-        }
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [showQR, isCalled, handleQRDismiss, handleStartSession, handleFallbackStart])
-
-
     // ── Admin Hold Gesture ──
-    const handleAdminHoldStart = useCallback(() => {
+    // Timer in a ref: on touch screens touchstart + the emulated mousedown both start a hold
+    const handleAdminHoldEnd = useCallback(() => {
+        if (holdTimerRef.current) { clearInterval(holdTimerRef.current); holdTimerRef.current = null }
+        setHoldProgress(0)
+    }, [])
+
+    // step = % per 50 ms: 5 = 1 s on the gear, 1 = 5 s when holding button 1 (same as Landing)
+    const handleAdminHoldStart = useCallback((step = 5) => {
+        handleAdminHoldEnd()
         const timer = setInterval(() => {
             setHoldProgress(prev => {
                 if (prev >= 100) {
                     clearInterval(timer)
+                    setPinSequence('')
                     setShowAdminModal(true)
                     return 0
                 }
-                return prev + 5
+                return prev + step
             })
         }, 50)
-        setHoldTimer(timer)
-    }, [])
+        holdTimerRef.current = timer
+    }, [handleAdminHoldEnd])
 
-    const handleAdminHoldEnd = useCallback(() => {
-        if (holdTimer) { clearInterval(holdTimer); setHoldTimer(null) }
-        setHoldProgress(0)
-    }, [holdTimer])
+    // Same PINs as Landing. A wrong PIN closes the modal: on a button-only booth there is no other way out of it.
+    const tryAdminPin = useCallback((pin: string) => {
+        if (pin === '123' || pin === ADMIN_PASSWORD) {
+            setShowAdminModal(false)
+            setPinSequence('')
+            setAdminPassword('')
+            navigate('/admin')
+            return
+        }
+        setPasswordError(true)
+        setTimeout(() => {
+            setPasswordError(false)
+            setPinSequence('')
+            setShowAdminModal(false)
+        }, 1000)
+    }, [navigate])
 
     const handleAdminSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        if (adminPassword === ADMIN_PASSWORD) {
-            setShowAdminModal(false)
-            setAdminPassword('')
-            navigate('/admin')
-        } else {
-            setPasswordError(true)
-            setTimeout(() => setPasswordError(false), 2000)
-        }
+        tryAdminPin(adminPassword || pinSequence)
     }
+
+    // Keyboard: 2/3 start, hold 1 for 5 s = admin; while the admin modal is open 1/2/3 enter the PIN
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+            if (e.key !== '1' && e.key !== '2' && e.key !== '3') return
+            e.preventDefault()
+
+            if (showAdminModal) {
+                const next = pinSequence + e.key
+                setPinSequence(next)
+                if (next.length >= 3) tryAdminPin(next)
+            } else if (showQR) {
+                handleQRDismiss()
+            } else if (e.key === '1') {
+                // Touch dock sends keydown only (untrusted, no keyup): never start the hold there
+                if (!e.repeat && e.isTrusted) handleAdminHoldStart(1)
+            } else if (isCalled) {
+                handleStartSession()
+            } else {
+                handleFallbackStart()
+            }
+        }
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === '1') handleAdminHoldEnd()
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        window.addEventListener('keyup', handleKeyUp)
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('keyup', handleKeyUp)
+        }
+    }, [showAdminModal, pinSequence, tryAdminPin, showQR, isCalled, handleQRDismiss, handleStartSession, handleFallbackStart, handleAdminHoldStart, handleAdminHoldEnd])
 
     // ── Format time ──
     const formatTime = (seconds: number) => {
@@ -509,10 +532,10 @@ function QueueDisplay(): JSX.Element {
             {/* ── Admin Trigger ── */}
             <div
                 className={styles.adminTrigger}
-                onMouseDown={handleAdminHoldStart}
+                onMouseDown={() => handleAdminHoldStart()}
                 onMouseUp={handleAdminHoldEnd}
                 onMouseLeave={handleAdminHoldEnd}
-                onTouchStart={handleAdminHoldStart}
+                onTouchStart={() => handleAdminHoldStart()}
                 onTouchEnd={handleAdminHoldEnd}
                 title="Admin"
             >
@@ -537,15 +560,33 @@ function QueueDisplay(): JSX.Element {
                             exit={{ scale: 0.9, y: 20 }}
                             onClick={e => e.stopPropagation()}
                         >
-                            <h3>Admin Access</h3>
+                            <h3>Akses Admin</h3>
+                            <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px', textAlign: 'center' }}>
+                                Masukkan PIN admin dengan tombol 1, 2 dan 3
+                            </p>
+                            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginBottom: '20px' }}>
+                                {Array.from({ length: 3 }, (_, i) => (
+                                    <div
+                                        key={i}
+                                        style={{
+                                            width: '20px',
+                                            height: '20px',
+                                            borderRadius: '50%',
+                                            border: '2px solid #3b82f6',
+                                            backgroundColor: pinSequence.length > i ? '#3b82f6' : 'transparent',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    />
+                                ))}
+                            </div>
                             <form onSubmit={handleAdminSubmit}>
+                                {/* No autoFocus: a focused input swallows the 1/2/3 presses */}
                                 <input
                                     type="password"
-                                    placeholder="Enter password"
-                                    value={adminPassword}
+                                    placeholder="Atau ketik PIN"
+                                    value={adminPassword || pinSequence}
                                     onChange={e => setAdminPassword(e.target.value)}
                                     className={`${styles.passwordInput} ${passwordError ? styles.error : ''}`}
-                                    autoFocus
                                 />
                                 <button type="submit" className={styles.submitButton}>Enter</button>
                             </form>

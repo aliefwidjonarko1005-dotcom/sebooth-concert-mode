@@ -3,6 +3,7 @@ import { google } from 'googleapis'
 import fs from 'fs'
 import path from 'path'
 import url from 'url'
+import { assertReadable } from '../lib/safePath'
 import { app } from 'electron'
 
 // dotenv is loaded centrally in lib/env.ts (imported first by index.ts)
@@ -24,6 +25,7 @@ export function registerDriveHandlers(ipcMain: IpcMain): void {
             if (!GOOGLE_DRIVE_FOLDER_ID) {
                 return { success: false, error: 'GOOGLE_DRIVE_FOLDER_ID is not configured in .env' }
             }
+            for (const f of params.files || []) await assertReadable(f.path)
 
             // Look for credentials.json in the app directory root
             const credentialsPath = app.isPackaged

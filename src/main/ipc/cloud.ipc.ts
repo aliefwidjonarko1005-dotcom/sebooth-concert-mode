@@ -3,6 +3,7 @@ import { Storage } from '@google-cloud/storage';
 import path from 'path';
 import fs from 'fs';
 import { uploadQueue } from '../services/UploadQueue';
+import { assertReadable } from '../lib/safePath';
 import { getGCSKeyPath } from '../lib/paths';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, GCS_BUCKET_NAME } from '@shared/supabaseConfig';
@@ -128,7 +129,10 @@ export function registerCloudHandlers(): void {
     if (!storage) {
        return { success: false, error: 'Google Cloud API Key not found' };
     }
-    
+    if (params.filePath) {
+      try { await assertReadable(params.filePath); } catch (e: any) { return { success: false, error: e.message }; }
+    }
+
     // Generate Public URL (assuming the bucket has public read access)
     // We return this immediately so UI doesn't block if we must fallback to queue
     const publicUrl = `https://storage.googleapis.com/${params.bucketName}/${params.destinationPath}`;

@@ -5,7 +5,7 @@ import { useFrameStore, useAppConfig, useFilterStore, useSessionStore, useEventS
 import { DEFAULT_VIEW_ZOOM, WIDE_VIEW_ZOOM, isWideView } from '@shared/viewZoom'
 import { AppConfig, FrameConfig, PhotoSlot, PrinterDevice, ChromaKeyConfig } from '@shared/types'
 import { v4 as uuidv4 } from 'uuid'
-import { apiHelper } from '../lib/apiHelper'
+import { apiHelper, isElectron } from '../lib/apiHelper'
 import { getSessionHistory, SessionHistoryItem, getSupabase } from '../lib/supabase'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import { ChromaKeyModal } from '../components/ChromaKeyModal/ChromaKeyModal'
@@ -84,6 +84,8 @@ function AdminDashboard(): JSX.Element {
 
     // Fetch handlers
     const fetchIp = async () => {
+        // Remote admin (a phone browser on :5050) has no window.api: skip instead of throwing
+        if (!isElectron) return
         const result = await (window as any).api.system.getLocalIp()
         if (result.success && result.data) setLocalIp(result.data)
     }
@@ -157,6 +159,7 @@ function AdminDashboard(): JSX.Element {
     // Fetch available printers
     useEffect(() => {
         const fetchPrinters = async () => {
+            if (!isElectron) return
             const result = await window.api.printer.list()
             if (result.success && result.data) {
                 setAvailablePrinters(result.data)

@@ -105,7 +105,7 @@ function PickupCounter(): JSX.Element {
     const navigate = useNavigate()
     const [jobs, setJobs] = useState<PrintJob[]>([])
     const [status, setStatus] = useState<ServerStatus | null>(null)
-    const [offline, setOffline] = useState(false)
+    const [offline, setOffline] = useState<false | 'network' | 'key'>(false)
     const [lastOk, setLastOk] = useState<number | null>(null)
     const [query, setQuery] = useState('')
     const [filter, setFilter] = useState<Filter>('open')
@@ -137,8 +137,9 @@ function PickupCounter(): JSX.Element {
             }
             setOffline(false)
             setLastOk(Date.now())
-        } catch {
-            setOffline(true)
+        } catch (e) {
+            // 401 = this browser has no LAN key (link opened without ?k=), not a network problem
+            setOffline((e as Error).message === '401' ? 'key' : 'network')
         }
     }, [])
 
@@ -283,10 +284,16 @@ function PickupCounter(): JSX.Element {
 
             {offline && (
                 <div className={`${styles.banner} ${styles.bannerBad}`} role="alert">
-                    <span>
-                        <b>Tidak terhubung ke print server.</b> Pastikan laptop loket menyala dan satu jaringan.
-                        {lastOk && ` Daftar di bawah adalah data terakhir jam ${clock(lastOk)} dan mungkin sudah berubah.`}
-                    </span>
+                    {offline === 'key' ? (
+                        <span>
+                            <b>Butuh kunci LAN.</b> Buka link loket yang ada di Admin booth (tab Printer, bagian Loket dari HP staf); link itu berisi kuncinya.
+                        </span>
+                    ) : (
+                        <span>
+                            <b>Tidak terhubung ke print server.</b> Pastikan laptop loket menyala dan satu jaringan.
+                            {lastOk && ` Daftar di bawah adalah data terakhir jam ${clock(lastOk)} dan mungkin sudah berubah.`}
+                        </span>
+                    )}
                 </div>
             )}
             {status && !status.printServerEnabled && (

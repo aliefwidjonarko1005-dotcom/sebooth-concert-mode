@@ -13,7 +13,8 @@ import './styles/brand.css'
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <React.StrictMode>
-        <HashRouter>
+        {/* Opt in to the v7 behaviour now: silences the two future-flag warnings on every start */}
+        <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <App />
         </HashRouter>
     </React.StrictMode>

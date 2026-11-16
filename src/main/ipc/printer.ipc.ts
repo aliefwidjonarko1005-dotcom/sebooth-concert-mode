@@ -7,6 +7,7 @@ import { PrinterDevice, PrintResult, APIResponse } from '@shared/types'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as os from 'os'
+import { assertReadable } from '../lib/safePath'
 
 /**
  * Register all printer-related IPC handlers
@@ -55,6 +56,7 @@ export function registerPrinterHandlers(ipcMain: IpcMain): void {
     // Print a file silently (Routed through the queue)
     ipcMain.handle('printer:print', async (_, filePath: string, printerName?: string): Promise<APIResponse<PrintResult>> => {
         try {
+            await assertReadable(filePath)
             const sessionId = path.basename(path.dirname(filePath)) || 'unknown'
             const config = configService.getConfig()
             printQueueService.addJob(sessionId, filePath, printerName || 'Print to PDF', 1, config.deviceName || 'Local')

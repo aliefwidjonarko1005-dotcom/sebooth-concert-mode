@@ -425,6 +425,14 @@
     margin-bottom: var(--spacing-md);
 }
 
+.errorReason {
+    margin: var(--spacing-sm) auto 0;
+    max-width: 32ch;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--brand-ink);
+}
+
 .errorDisplay button {
     margin-top: var(--spacing-lg);
     padding: var(--spacing-md) var(--spacing-xl);

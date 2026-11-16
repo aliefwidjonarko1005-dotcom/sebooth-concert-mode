@@ -235,9 +235,11 @@ function Landing(): JSX.Element {
                         navigate('/admin')
                     } else if (nextSeq.length >= 3) {
                         setPasswordError(true)
+                        // Wrong PIN closes the modal: on a button-only booth there is no other way out of it
                         setTimeout(() => {
                             setPasswordError(false)
                             setPinSequence('')
+                            setShowAdminModal(false)
                         }, 1000)
                     }
                 }
@@ -565,7 +567,6 @@ function Landing(): JSX.Element {
                                     value={adminPassword || pinSequence}
                                     onChange={e => setAdminPassword(e.target.value)}
                                     className={`${styles.passwordInput} ${passwordError ? styles.error : ''}`}
-                                    autoFocus
                                 />
                                 <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
                                     <button

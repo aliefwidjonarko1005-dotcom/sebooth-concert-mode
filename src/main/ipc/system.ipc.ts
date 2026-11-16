@@ -1,5 +1,6 @@
 import { IpcMain, dialog, app } from 'electron'
-import { join } from 'path'
+import { basename, join } from 'path'
+import { readFile } from 'fs/promises'
 import { existsSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, rmSync, renameSync, readdirSync } from 'fs'
 import { APIResponse } from '@shared/types'
 import sharp from 'sharp'
@@ -7,6 +8,7 @@ import sharp from 'sharp'
 import ffmpeg from 'fluent-ffmpeg'
 import { getFFmpegPath } from '../lib/paths'
 import { getLocalIpAddress } from '../server'
+import { assertReadable, assertWritable, rememberPicked } from '../lib/safePath'
 import { enqueueSessionUpload, isCloudUploadReady } from './cloud.ipc'
 
 ffmpeg.setFfmpegPath(getFFmpegPath())
@@ -72,6 +74,7 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
                 return { success: true, data: [] }
             }
 
+            await rememberPicked(result.filePaths)
             return { success: true, data: result.filePaths }
         } catch (error) {
             const err = error as Error
@@ -99,6 +102,8 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
     // Copy file to destination
     ipcMain.handle('system:copy-file', async (_, source: string, destination: string): Promise<APIResponse<string>> => {
         try {
+            await assertReadable(source)
+            await assertWritable(destination)
             // Ensure destination directory exists
             const destDir = join(destination, '..')
             if (!existsSync(destDir)) {
@@ -113,51 +118,17 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
         }
     })
 
-    // Read JSON file
-    ipcMain.handle('system:read-json', async (_, filePath: string): Promise<APIResponse<unknown>> => {
-        try {
-            if (!existsSync(filePath)) {
-                return { success: false, error: 'File not found' }
-            }
+    // system:read-json / write-json / file-exists were removed: nothing in the UI used them and they let
+    // the renderer read or write any file on the PC.
 
-            const content = readFileSync(filePath, 'utf-8')
-            const data = JSON.parse(content)
-            return { success: true, data }
-        } catch (error) {
-            const err = error as Error
-            return { success: false, error: err.message }
-        }
-    })
-
-    // Write JSON file
-    ipcMain.handle('system:write-json', async (_, filePath: string, data: unknown): Promise<APIResponse<void>> => {
-        try {
-            // Ensure directory exists
-            const dir = join(filePath, '..')
-            if (!existsSync(dir)) {
-                mkdirSync(dir, { recursive: true })
-            }
-
-            writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-            return { success: true }
-        } catch (error) {
-            const err = error as Error
-            return { success: false, error: err.message }
-        }
-    })
-
-    // Check if file exists
-    ipcMain.handle('system:file-exists', async (_, filePath: string): Promise<APIResponse<boolean>> => {
-        return { success: true, data: existsSync(filePath) }
-    })
-
-    // Read file as base64 string
+    // Read file as base64 string (capture result, flipbook previews): app folders only
     ipcMain.handle('system:read-file-base64', async (_, filePath: string): Promise<APIResponse<string>> => {
         try {
+            await assertReadable(filePath)
             if (!existsSync(filePath)) {
                 return { success: false, error: `File not found: ${filePath}` }
             }
-            const buffer = readFileSync(filePath)
+            const buffer = await readFile(filePath)
             return { success: true, data: buffer.toString('base64') }
         } catch (error) {
             const err = error as Error
@@ -252,7 +223,8 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
             const base64Data = matches[2]
             const buffer = Buffer.from(base64Data, 'base64')
 
-            const filePath = join(tempPath, filename)
+            // basename: a "../" filename used to write anywhere on disk
+            const filePath = join(tempPath, basename(String(filename)))
             writeFileSync(filePath, buffer)
 
             return { success: true, data: filePath }
@@ -278,7 +250,7 @@ export function registerSystemHandlers(ipcMain: IpcMain): void {
             const base64Data = matches[2]
             const buffer = Buffer.from(base64Data, 'base64')
 
-            const filePath = join(framesDir, filename)
+            const filePath = join(framesDir, basename(String(filename)))
             writeFileSync(filePath, buffer)
 
             return { success: true, data: filePath }
