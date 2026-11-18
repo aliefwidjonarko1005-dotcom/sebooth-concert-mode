@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useFrameStore, useSessionStore, useAppConfig, useCameraStore } from '../stores'
 import { SessionTimer } from '../components/SessionTimer'
-import { useButtonHints, useRailStatus, useInputMode } from '../components/ButtonRail/ButtonRail'
+import { useButtonHints, useRailStatus, useInputMode, pressKey } from '../components/ButtonRail/ButtonRail'
 import { isWideView, toggleViewZoom } from '@shared/viewZoom'
 import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import { CountdownBurst, SnapBurst } from '../components/CaptureArt/CaptureArt'
@@ -1072,6 +1072,8 @@ function CaptureSession(): JSX.Element {
                 : cameraError ? { 3: { label: 'Coba lagi', primary: true, onScreen: true } } : {})
         })
     useRailStatus(`Foto ${shotNumber}/${captureSlots.length}`)
+    // Touch booth: a tap anywhere outside the controls takes the photo, through the same path as button 3
+    const tapToShoot = touch && captureState === 'idle' && cameraReady && !isConfirmModalOpen && !isAdjustPanelOpen
 
     // Early return only after every hook above (rules of hooks)
     if (!currentFrame) {
@@ -1092,6 +1094,9 @@ function CaptureSession(): JSX.Element {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            onClick={tapToShoot ? (e) => {
+                if (!(e.target as Element).closest('button, a, input, select, textarea, label')) pressKey(3)
+            } : undefined}
         >
             {/* Hidden canvas for webcam capture */}
             <canvas ref={canvasRef} style={{ display: 'none' }} />

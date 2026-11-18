@@ -8,7 +8,7 @@ import styles from './OutputPage.module.css'
 import { useEmitOnChange, emitMascot } from '../lib/mascotEvents'
 import { useElementSize } from '../lib/useElementHeight'
 import { useButtonHints, useInputMode } from '../components/ButtonRail/ButtonRail'
-import { useSwipe } from '../lib/useSwipe'
+import { useSwipe, swipeTap } from '../lib/useSwipe'
 import { buildComposite, buildGifFrames, buildSaveParams, getPhotoForSlot, getQRUrl } from '../lib/composite'
 import Lottie from 'lottie-react'
 import PA22Animation from '../assets/PA22.json'
@@ -495,7 +495,7 @@ function OutputPage(): JSX.Element | null {
                                         setActiveIndex(idx)
                                     }
                                 }}
-                                onTap={touch ? () => { if (!isCenter) setActiveIndex(idx) } : undefined}
+                                onTap={touch ? swipeTap(() => { if (!isCenter) setActiveIndex(idx) }) : undefined}
                             >
                                 {/* Header Title at Top of Output File Item */}
                                 <div className={styles.cardItemHeader}>

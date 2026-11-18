@@ -7,7 +7,7 @@ import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import styles from './FrameSelection.module.css'
 import { emitMascot } from '../lib/mascotEvents'
 import { useButtonHints, useInputMode } from '../components/ButtonRail/ButtonRail'
-import { useSwipe } from '../lib/useSwipe'
+import { useSwipe, swipeTap } from '../lib/useSwipe'
 import { useElementSize } from '../lib/useElementHeight'
 
 function FrameSelection(): JSX.Element {
@@ -187,14 +187,14 @@ function FrameSelection(): JSX.Element {
                                                 setFocusedIndex(index)
                                             }
                                         }}
-                                        // onTap is not fired after a pan, so a swipe never selects
-                                        onTap={touch ? () => {
+                                        // swipeTap: the tap that ends a swipe over this card is not a pick
+                                        onTap={touch ? swipeTap(() => {
                                             if (isFocused) handleSelectFrame(frame.id)
                                             else {
                                                 setFocusedIndex(index)
                                                 emitMascot('focus')
                                             }
-                                        } : undefined}
+                                        }) : undefined}
                                         animate={{
                                             x: translateX,
                                             scale,
