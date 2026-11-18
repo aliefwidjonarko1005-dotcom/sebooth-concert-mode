@@ -50,7 +50,7 @@ const useHintStore = create<{
 
 /** Declare the physical button actions for the current screen. Pass a stable-ish object; it's compared by content. */
 // A click/tap = a short press of the physical button (keydown then keyup, so hold timers see a release)
-function pressKey(k: ButtonKey): void {
+export function pressKey(k: ButtonKey): void {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: String(k), bubbles: true }))
     window.dispatchEvent(new KeyboardEvent('keyup', { key: String(k), bubbles: true }))
 }

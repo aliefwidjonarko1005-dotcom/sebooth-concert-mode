@@ -633,6 +633,13 @@
     cursor: pointer;
 }
 
+/* LANDSCAPE (touch booth) ONLY: guests switch wide view mid-session, so a bigger target (scales with screen height) */
+:global(body.app-landscape) .viewToggle {
+    height: clamp(64px, 8vh, 88px);
+    padding: 0 clamp(24px, 3vh, 36px);
+    font-size: clamp(18px, 2.4vh, 24px);
+}
+
 .progressChip {
     background: var(--brand-ink);
     color: #FFFFFF;

@@ -7,7 +7,7 @@ import styles from './ReviewSession.module.css'
 import { useEmitOnChange, emitMascot } from '../lib/mascotEvents'
 import { useElementHeight } from '../lib/useElementHeight'
 import { useButtonHints, useInputMode, useRailStatus } from '../components/ButtonRail/ButtonRail'
-import { useSwipe } from '../lib/useSwipe'
+import { useSwipe, swipeTap } from '../lib/useSwipe'
 
 type FilterType = 'none' | 'grayscale' | 'sepia' | 'warm' | 'cool' | 'vintage'
 
@@ -228,8 +228,8 @@ const ReviewSession: React.FC = () => {
                                         setSessionFilter(filter.id)
                                     }
                                 }}
-                                // onTap is not fired after a pan, so ending a swipe on a side card is not a tap
-                                onTap={touch ? () => { if (!isCenter) setSessionFilter(filter.id) } : undefined}
+                                // swipeTap: ending a swipe on a side card is not a tap
+                                onTap={touch ? swipeTap(() => { if (!isCenter) setSessionFilter(filter.id) }) : undefined}
                             >
                                 {/* Inner Canvas Container representing the completed photo strip */}
                                 <div
