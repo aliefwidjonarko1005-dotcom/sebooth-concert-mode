@@ -1,4 +1,4 @@
-import sharp from 'sharp'
+import sharp, { type OverlayOptions } from 'sharp'
 import { mkdir } from 'fs/promises'
 import { join } from 'path'
 
@@ -65,7 +65,7 @@ export async function buildFlipbookSheets(opts: {
     const out: string[] = []
 
     for (let sheet = 0; sheet < sheets; sheet++) {
-        const layers: sharp.OverlayOptions[] = []
+        const layers: OverlayOptions[] = []
         for (let col = 0; col < 2; col++) {
             for (let half = 0; half < 2; half++) {
                 const p = flipbookPageAt(sheets, sheet, col, half)

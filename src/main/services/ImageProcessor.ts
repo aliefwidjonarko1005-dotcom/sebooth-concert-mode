@@ -1,4 +1,4 @@
-import sharp from 'sharp'
+import sharp, { type OverlayOptions } from 'sharp'
 import { existsSync, mkdirSync } from 'fs'
 import { dirname } from 'path'
 import { PhotoSlot } from '@shared/types'
@@ -41,7 +41,7 @@ export class ImageProcessor {
         })
 
         // Prepare photo layers
-        const photoLayers: sharp.OverlayOptions[] = []
+        const photoLayers: OverlayOptions[] = []
 
         for (const photo of photos) {
             if (!existsSync(photo.path)) continue
@@ -183,7 +183,7 @@ export class ImageProcessor {
 
         // Create a horizontal strip for multiple images
         const stripWidth = width * validPaths.length
-        const buffers: sharp.OverlayOptions[] = []
+        const buffers: OverlayOptions[] = []
 
         for (let i = 0; i < validPaths.length; i++) {
             const buffer = await sharp(validPaths[i])

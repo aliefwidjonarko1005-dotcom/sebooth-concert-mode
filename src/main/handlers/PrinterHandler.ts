@@ -40,14 +40,26 @@ export class PrinterHandler {
             const tempWin = new BrowserWindow({ show: false })
             const printers = await tempWin.webContents.getPrintersAsync()
             tempWin.destroy()
+            const defaultName = await this.defaultPrinterName()
 
             return printers.map(p => ({
                 name: p.name,
-                isDefault: p.isDefault
+                isDefault: p.name === defaultName
             }))
         } catch (error) {
             console.error('Failed to list printers:', error)
             return []
+        }
+    }
+
+    // Electron 36 removed PrinterInfo.isDefault; Windows stores the default as "Name,winspool,Ne01:".
+    private async defaultPrinterName(): Promise<string | undefined> {
+        if (process.platform !== 'win32') return undefined
+        try {
+            const { stdout } = await execAsync('reg query "HKCU\\Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows" /v Device', { windowsHide: true, timeout: 5000 })
+            return /Device\s+REG_SZ\s+([^,\r\n]+)/i.exec(stdout)?.[1]?.trim()
+        } catch {
+            return undefined
         }
     }
 
