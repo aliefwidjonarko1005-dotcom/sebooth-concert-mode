@@ -23,6 +23,9 @@ function FinalizePage(): JSX.Element | null {
 
     const [preview, setPreview] = useState<string | null>(null)
     const printStarted = useRef(false)
+    // Add-on: after the mirror choice, a full-page step asks how many strips to print (null = mirror step)
+    const defaultQty = config.concertPrintQuantity || 2
+    const [qty, setQty] = useState<number | null>(null)
 
     const frame = frames.find(f => f.id === currentSession?.frameId) || null
 
@@ -80,7 +83,8 @@ function FinalizePage(): JSX.Element | null {
         return () => { cancelled = true }
     }, [isMirrored, frame, sessionPhotos, currentSession?.id, activeEvent, config])
 
-    const handlePrint = useCallback(() => {
+    // Auto-print timeout calls this without a number: use the last quantity picked (or the default)
+    const handlePrint = useCallback((quantity?: number) => {
         if (printStarted.current || !preview || !currentSession || !frame) return
         printStarted.current = true
 
@@ -121,29 +125,44 @@ function FinalizePage(): JSX.Element | null {
             }
         })()
 
-        navigate('/printing', { state: { printQuantity: config.concertPrintQuantity || 2 } })
-    }, [preview, currentSession, frame, photos, sessionPhotos, isMirrored, config, activeEvent, updateConfig, setPickupLabel, navigate])
+        navigate('/printing', { state: { printQuantity: quantity ?? qty ?? defaultQty } })
+    }, [preview, currentSession, frame, photos, sessionPhotos, isMirrored, config, activeEvent, updateConfig, setPickupLabel, navigate, qty, defaultQty])
+
+    // Below 2 the quantity step goes back to the mirror step
+    const lessQty = useCallback(() => setQty(q => (q === null || q <= 2 ? null : q - 2)), [])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-            if (e.key === '2') {
+            if (e.key !== '1' && e.key !== '2' && e.key !== '3') return
+            if (printStarted.current) return
+            if (qty !== null) {
+                // Quantity step: 1 = fewer (back at 2), 2 = more, 3 = print
                 e.preventDefault()
-                if (!printStarted.current) setIsMirrored(!isMirrored)
+                if (e.key === '1') lessQty()
+                else if (e.key === '2') setQty(qty + 2)
+                else handlePrint(qty)
+            } else if (e.key === '2') {
+                e.preventDefault()
+                setIsMirrored(!isMirrored)
             } else if (e.key === '3') {
                 e.preventDefault()
-                handlePrint()
+                if (preview) setQty(defaultQty)
             }
         }
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [isMirrored, setIsMirrored, handlePrint])
+    }, [isMirrored, setIsMirrored, preview, qty, defaultQty, lessQty, handlePrint])
 
     const touch = useInputMode() === 'touch'
-    useButtonHints(preview && photos.length > 0 ? {
+    useButtonHints(!preview || photos.length === 0 ? {} : qty !== null ? {
+        1: { label: qty <= 2 ? 'Kembali' : 'Kurangi', onScreen: true },
+        2: { label: 'Tambah', onScreen: true },
+        3: { label: `Cetak ${qty} foto`, primary: true, onScreen: true }
+    } : {
         2: { label: 'Ganti mirror', onScreen: true },
-        3: { label: 'Cetak sekarang', primary: true, onScreen: true }
-    } : {})
+        3: { label: 'Lanjut', primary: true, onScreen: true }
+    })
 
     if (!currentSession || !frame) return null
 
@@ -157,8 +176,36 @@ function FinalizePage(): JSX.Element | null {
 
     return (
         <motion.div className={styles.container} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <SessionTimer duration={AUTO_PRINT_SECONDS} onTimeout={handlePrint} enabled={!!preview} label="Cetak otomatis" />
+            <SessionTimer duration={AUTO_PRINT_SECONDS} onTimeout={() => handlePrint()} enabled={!!preview} label="Cetak otomatis" />
 
+            {qty !== null ? (
+            <section className={styles.info}>
+                <h1 className={`kiosk-title ${styles.title}`}>Mau cetak berapa?</h1>
+                <p className={styles.lead}>Satu lembar cetak berisi 2 strip. Semua diambil di loket.</p>
+
+                <div className={styles.qtyRow}>
+                    <button type="button" className={styles.qtyBtn} onClick={lessQty} disabled={touch && qty <= 2} aria-label="Kurangi">−</button>
+                    <span className={`kiosk-num ${styles.qtyNum}`}>{qty}</span>
+                    <button type="button" className={styles.qtyBtn} onClick={() => setQty(qty + 2)} aria-label="Tambah">+</button>
+                </div>
+                <p className={styles.sheets}>{qty / 2} lembar cetak</p>
+                {touch
+                    ? <button type="button" className={styles.backLink} onClick={() => setQty(null)}>Kembali</button>
+                    : <span className={styles.mirrorHint}>Tekan 1 untuk kurangi, 2 untuk tambah</span>}
+
+                <button className={styles.printCue} onClick={() => handlePrint(qty)}>
+                    {touch ? (
+                        <span>Ketuk untuk cetak {qty} foto</span>
+                    ) : (
+                        <>
+                            <span>Tekan</span>
+                            <span className={styles.key}>3</span>
+                            <span>cetak {qty} foto</span>
+                        </>
+                    )}
+                </button>
+            </section>
+            ) : (
             <section className={styles.info}>
                 <h1 className={`kiosk-title ${styles.title}`}>Siap <em>dicetak?</em></h1>
                 <p className={styles.lead}>Cek sekali lagi. Strip akan langsung dicetak dan bisa diambil di loket.</p>
@@ -181,18 +228,19 @@ function FinalizePage(): JSX.Element | null {
                     )}
                 </div>
 
-                <button className={styles.printCue} onClick={handlePrint} disabled={!preview}>
+                <button className={styles.printCue} onClick={() => setQty(defaultQty)} disabled={!preview}>
                     {touch ? (
-                        <span>Ketuk untuk cetak</span>
+                        <span>Ketuk untuk lanjut</span>
                     ) : (
                         <>
                             <span>Tekan</span>
                             <span className={styles.key}>3</span>
-                            <span>untuk cetak</span>
+                            <span>untuk lanjut</span>
                         </>
                     )}
                 </button>
             </section>
+            )}
 
             <div className={styles.previewWrap}>
                 {preview
