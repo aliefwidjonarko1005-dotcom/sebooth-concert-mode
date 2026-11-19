@@ -109,6 +109,63 @@
     font-weight: 900;
 }
 
+/* Print-quantity step (concert add-on): − number + */
+.qtyRow {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-top: 8px;
+}
+
+.qtyBtn {
+    width: 88px;
+    height: 88px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    border: var(--ink-line);
+    font-family: inherit;
+    font-size: 56px;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.qtyBtn:disabled {
+    opacity: 0.4;
+}
+
+.qtyNum {
+    min-width: 1.4em;
+    text-align: center;
+    font-size: min(160px, 18vh);
+    line-height: 1;
+    color: #FFFFFF;
+}
+
+.sheets {
+    font-size: 24px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.backLink {
+    align-self: flex-start;
+    padding: 8px 0;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.85);
+    font-family: inherit;
+    font-size: 20px;
+    font-weight: 700;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
 .previewWrap {
     flex: 1;
     min-width: 0;
