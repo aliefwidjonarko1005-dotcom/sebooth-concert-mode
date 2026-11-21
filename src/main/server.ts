@@ -395,8 +395,24 @@ export function startLocalServer(port = 5050) {
         res.sendFile(job.filePath)
     })
 
+    // Sheet count from the Loket (1-20); undefined when not sent, null when invalid
+    const sheetsFrom = (body: { copies?: unknown } | undefined): number | undefined | null => {
+        if (body?.copies === undefined) return undefined
+        const n = Number(body.copies)
+        return Number.isInteger(n) && n >= 1 && n <= 20 ? n : null
+    }
+
     server.post('/api/print/jobs/:id/reprint', (req, res) => {
-        const job = printQueueService.reprint(req.params.id)
+        const copies = sheetsFrom(req.body)
+        if (copies === null) { res.status(400).json({ success: false, error: 'copies must be 1-20' }); return }
+        const job = printQueueService.reprint(req.params.id, copies)
+        res.status(job ? 200 : 404).json({ success: !!job, data: job })
+    })
+
+    server.post('/api/print/jobs/:id/extra', (req, res) => {
+        const copies = sheetsFrom(req.body)
+        if (!copies) { res.status(400).json({ success: false, error: 'copies must be 1-20' }); return }
+        const job = printQueueService.printExtra(req.params.id, copies)
         res.status(job ? 200 : 404).json({ success: !!job, data: job })
     })
 

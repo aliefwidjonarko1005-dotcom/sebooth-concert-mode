@@ -78,7 +78,7 @@ Komponen: `ConfirmBackHomeModal`, `EmailModal`, `PrintQuantityModal`, `QRCodeMod
 - **payment**: doku-create-session doku-check-status midtrans-charge midtrans-status (via `/api/booth/payment` saat Booth Guard aktif) · **cloud**: upload-file get-queue · **drive**: upload-session · **email**: send is-configured · **config**: get update · **window**: toggle-fullscreen toggle-kiosk · **guard**: get-state (+ event `guard:state`) · **system**: get-lan-key verify-admin-pin
 
 ## Express (`main/server.ts`, :5050)
-`GET /api/config` `POST /api/config` · `GET /api/sessions` · `GET /api/camera/liveview` · `GET /api/print/queue` `GET /api/print/history` `POST /api/print/:sessionId` · `POST /api/remote-print` `GET /api/remote-print/status` · `GET /gallery/:sessionId` · `GET /monitor`
+`GET /api/config` `POST /api/config` · `GET /api/sessions` · `GET /api/camera/liveview` · `GET /api/print/queue` `GET /api/print/history` `POST /api/print/jobs/:id/extra` (cetak tambahan dari Loket) · `POST /api/print/:sessionId` · `POST /api/remote-print` `GET /api/remote-print/status` · `GET /gallery/:sessionId` · `GET /monitor`
 
 ## Hub (paling banyak koneksi — ubah dengan hati-hati)
 `useAppConfig`, `useSessionStore`, `useFrameStore`, `CanonEDSDKCamera`, `CameraHandler`/`CameraDevice`/`CaptureResult` (shared/types), `ConfirmBackHomeModal`, `App()`.

@@ -430,6 +430,27 @@
     font-family: inherit;
 }
 
+/* Extra sheets for a past session: label, − n +, print */
+.extraRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+}
+
+.extraLabel {
+    flex-basis: 100%;
+    font-weight: 700;
+    color: var(--text-2);
+}
+
+.extraNum {
+    min-width: 80px;
+    text-align: center;
+}
+
 .modalActions {
     display: flex;
     flex-wrap: wrap;
