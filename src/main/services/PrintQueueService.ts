@@ -134,12 +134,19 @@ export class PrintQueueService {
     }
 
     /** Queue a finished or failed job again (same file, copies and pickup code). */
-    public reprint(jobId: string): PrintJob | undefined {
+    public reprint(jobId: string, copies?: number): PrintJob | undefined {
         const job = this.history.find(j => j.id === jobId)
         if (!job) return undefined
         job.reprintedAt = Date.now()
         this.saveHistory()
-        return this.addJob(job.sessionId, job.filePath, job.printerName, job.copies, job.sourceDevice, job.label)
+        return this.addJob(job.sessionId, job.filePath, job.printerName, copies ?? job.copies, job.sourceDevice, job.label)
+    }
+
+    /** Extra sheets of a past session (customer wants more later). Unlike reprint, the original job stays as it is. */
+    public printExtra(jobId: string, copies: number): PrintJob | undefined {
+        const job = this.history.find(j => j.id === jobId)
+        if (!job) return undefined
+        return this.addJob(job.sessionId, job.filePath, job.printerName, copies, job.sourceDevice, job.label)
     }
 
     /** Reprint every failed job nobody has handled yet (e.g. after refilling paper). */

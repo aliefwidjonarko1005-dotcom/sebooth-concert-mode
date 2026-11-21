@@ -210,16 +210,29 @@ function PickupCounter(): JSX.Element {
         })
     }
 
-    const reprint = (job: PrintJob) => {
+    const reprint = (job: PrintJob, n: number) => {
         const go = async () => {
-            if (await run(() => post(`/api/print/jobs/${job.id}/reprint`))) {
-                setToast({ text: `${job.label || 'Strip'} masuk antrean cetak ulang.` })
+            if (await run(() => post(`/api/print/jobs/${job.id}/reprint`, { copies: n }))) {
+                setToast({ text: `${job.label || 'Strip'} masuk antrean cetak ulang (${n} lembar).` })
             }
         }
         // "Siap" only means the spooler took it (a paper jam still counts), so confirm before spending paper
-        if (viewOf(job) === 'FAILED') go()
-        else setConfirm({ text: `Cetak ulang ${job.label || 'strip ini'}?`, yes: 'Cetak ulang', onYes: go })
+        if (viewOf(job) === 'FAILED' && n === job.copies) go()
+        else setConfirm({ text: `Cetak ulang ${job.label || 'strip ini'}, ${n} lembar?`, yes: `Cetak ulang ${n} lembar`, onYes: go })
     }
+
+    // Sheet count for "Cetak tambahan" / "Cetak ulang"; starts at the job's own count, resets when another job is opened
+    const [extra, setExtra] = useState({ id: '', n: 1 })
+    const printExtra = (job: PrintJob, n: number) => setConfirm({
+        text: `Cetak tambahan ${n} lembar untuk ${job.label || 'strip ini'}?`,
+        yes: `Cetak ${n} lembar`,
+        onYes: async () => {
+            if (await run(() => post(`/api/print/jobs/${job.id}/extra`, { copies: n }))) {
+                setToast({ text: `${n} lembar tambahan ${job.label || ''} masuk antrean cetak.` })
+                setExtra({ id: '', n: 1 })
+            }
+        }
+    })
 
     const counts = useMemo(() => {
         const c: Record<Filter, number> = { open: 0, READY: 0, busy: 0, FAILED: 0, PICKED: 0, all: 0 }
@@ -248,6 +261,7 @@ function PickupCounter(): JSX.Element {
 
     const failedOpen = jobs.filter(j => viewOf(j) === 'FAILED').length
     const selected = jobs.find(j => j.id === selectedId) || null
+    const sheets = selected && extra.id === selected.id ? extra.n : Math.min(20, Math.max(1, selected?.copies || 1))
     const boothsWithIssues = (status?.booths || []).filter(b => b.pending > 0 || status!.serverTime - b.lastSeen > BOOTH_STALE_MS)
 
     const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -455,6 +469,16 @@ function PickupCounter(): JSX.Element {
                                 <p className={styles.muted}>Sudah dicetak ulang {clock(selected.reprintedAt)} — serahkan dari kartu kode yang sama yang terbaru.</p>
                             )}
 
+                            {(selected.status === 'COMPLETED' || selected.status === 'FAILED') && (
+                                <div className={styles.extraRow}>
+                                    <span className={styles.extraLabel}>Jumlah cetak</span>
+                                    <button className={styles.ghostBtn} disabled={sheets <= 1} onClick={() => setExtra({ id: selected.id, n: sheets - 1 })} aria-label="Kurangi">−</button>
+                                    <strong className={styles.extraNum}>{sheets} lembar</strong>
+                                    <button className={styles.ghostBtn} disabled={sheets >= 20} onClick={() => setExtra({ id: selected.id, n: sheets + 1 })} aria-label="Tambah">+</button>
+                                    <button className={styles.solidBtn} disabled={busy} onClick={() => printExtra(selected, sheets)}>Cetak tambahan</button>
+                                </div>
+                            )}
+
                             <div className={styles.modalActions}>
                                 {(selected.status === 'COMPLETED' || selected.status === 'FAILED') && (
                                     selected.pickedUpAt ? (
@@ -468,7 +492,7 @@ function PickupCounter(): JSX.Element {
                                     )
                                 )}
                                 {(selected.status === 'COMPLETED' || selected.status === 'FAILED') && (
-                                    <button className={styles.ghostBtn} disabled={busy} onClick={() => reprint(selected)}>Cetak ulang</button>
+                                    <button className={styles.ghostBtn} disabled={busy} onClick={() => reprint(selected, sheets)}>Cetak ulang</button>
                                 )}
                                 <button data-primary={selected.status === 'QUEUED' || selected.status === 'PRINTING' ? true : undefined} className={styles.ghostBtn} onClick={closeDetail}>Tutup</button>
                             </div>
