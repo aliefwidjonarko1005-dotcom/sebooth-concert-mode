@@ -7,6 +7,7 @@ import {
     PrinterDevice,
     PrintResult,
     PhotoSlot,
+    FrameConfig,
     APIResponse
 } from '../shared/types'
 
@@ -253,6 +254,16 @@ const api = {
     },
 
     // Cloud APIs
+    // Frame packs in the cloud: upload from one laptop, download and use on another
+    frames: {
+        listPacks: (): Promise<APIResponse<{ id: string; name: string; createdAt: number; count: number }[]>> =>
+            ipcRenderer.invoke('frames:list-packs'),
+        uploadPack: (params: { name: string; frames: { frame: FrameConfig; png: Uint8Array }[] }): Promise<APIResponse<{ id: string; name: string; createdAt: number; count: number }>> =>
+            ipcRenderer.invoke('frames:upload-pack', params),
+        downloadPack: (id: string): Promise<APIResponse<FrameConfig[]>> =>
+            ipcRenderer.invoke('frames:download-pack', id)
+    },
+
     cloud: {
         uploadFile: (params: {
             bucketName: string;

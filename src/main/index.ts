@@ -11,6 +11,7 @@ import { registerImageHandlers } from './ipc/image.ipc'
 import { registerEmailHandlers } from './ipc/email.ipc'
 import { registerDriveHandlers } from './ipc/drive.ipc'
 import { registerCloudHandlers } from './ipc/cloud.ipc'
+import { registerFrameHandlers } from './ipc/frames.ipc'
 import { registerQueueHandlers } from './ipc/queue.ipc'
 import { registerPaymentHandlers } from './ipc/payment.ipc'
 import './services/ConfigService' // Boot ConfigService natively
@@ -87,6 +88,7 @@ app.whenReady().then(() => {
     registerEmailHandlers(ipcMain)
     registerDriveHandlers(ipcMain)
     registerCloudHandlers()
+    registerFrameHandlers()
     registerQueueHandlers()
     registerPaymentHandlers(ipcMain)
     

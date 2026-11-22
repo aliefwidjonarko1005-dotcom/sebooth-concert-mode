@@ -11,6 +11,7 @@ import { ConfirmBackHomeModal } from '../components/ConfirmBackHomeModal'
 import { ChromaKeyModal } from '../components/ChromaKeyModal/ChromaKeyModal'
 import { EventSessionTab } from '../components/EventSessionTab/EventSessionTab'
 import styles from './AdminDashboard.module.css'
+import { FramePacksPanel } from '../components/FramePacksPanel/FramePacksPanel'
 import { SeboothLogo } from '../components/brand/SeboothLogo'
 import { AmbientArt, AMBIENT_PALETTES, DEFAULT_AMBIENT_ART } from '../components/brand/AmbientArt'
 
@@ -956,6 +957,7 @@ function AdminDashboard(): JSX.Element {
                                     + Add
                                 </button>
                             </div>
+                            <FramePacksPanel />
 
                             <div className={styles.frameItems}>
                                 {frames.map(frame => (

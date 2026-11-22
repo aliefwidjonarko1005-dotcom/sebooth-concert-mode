@@ -33,6 +33,7 @@ Browser/iPad (remote admin) ──fetch──> main/server.ts (Express :5050) �
 | Shared printer multi-booth | `main/services/RemotePrintService.ts` (client, `sendOrQueue` → `userData/pending_prints/`, resend tiap 10s di `printer.ipc.ts`), `server.ts` `POST /api/remote-print` (dedupe per sessionId, file di `userData/print_jobs/`) |
 | Pembayaran QRIS (DOKU/Midtrans) | `main/ipc/payment.ipc.ts`, `renderer/pages/PaymentGateway.tsx` |
 | Antrean website sebooth.in | `main/services/QueueService.ts`, `main/ipc/queue.ipc.ts`, `renderer/pages/QueueDisplay.tsx` |
+| Paket frame cloud (upload/download antar laptop) | `main/ipc/frames.ipc.ts`, `renderer/components/FramePacksPanel/` (Admin → Frames), bucket `frame-packs/` |
 | Upload cloud (GCS + baris Supabase) + retry offline | `main/ipc/cloud.ipc.ts` (`drainQueue`, `enqueueSessionUpload`), `main/services/UploadQueue.ts` (`userData/upload_queue.json`), `main/ipc/drive.ipc.ts` |
 | Concert mode (alur cepat konser) | config `concertMode`… di `shared/types.ts`; deadline di `useSessionStore`; `CaptureSession` → `PhotoReviewPage` → `FinalizePage` → `PrintingPage` (layar kode loket) |
 | Email hasil | `main/ipc/email.ipc.ts`, `renderer/components/EmailModal/` |

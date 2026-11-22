@@ -30,6 +30,10 @@ try {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 
+export function getStorage(): Storage | null {
+  return storage;
+}
+
 export function isCloudUploadReady(): boolean {
   return storage !== null;
 }
