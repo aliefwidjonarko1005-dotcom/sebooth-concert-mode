@@ -316,6 +316,8 @@ function Landing(): JSX.Element {
     }
 
     const touch = useInputMode() === 'touch'
+    // Touch booth with the live camera on: tapping the camera starts the session, no start button
+    const tapToStart = touch && liveCameraEnabled
     useButtonHints({
         ...(liveCameraEnabled ? { 2: { label: wideView ? 'Default view' : 'Wide view', onScreen: true } } : {}),
         3: { label: 'Mulai foto', primary: true, onScreen: true }
@@ -324,7 +326,7 @@ function Landing(): JSX.Element {
 
     return (
         <motion.div
-            className={`${styles.container} ${liveCameraEnabled ? styles.hasLiveCam : ''} ${!liveCameraEnabled && hasCustomBg ? styles.hasCustomBg : ''}`}
+            className={`${styles.container} ${liveCameraEnabled ? styles.hasLiveCam : ''} ${tapToStart ? styles.tapToStart : ''} ${!liveCameraEnabled && hasCustomBg ? styles.hasCustomBg : ''}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -446,6 +448,7 @@ function Landing(): JSX.Element {
                 <h1 className={`kiosk-title ${styles.headline}`}>
                     Siap <em>berpose?</em>
                 </h1>
+                {tapToStart ? null : (
                 <button className={styles.ctaPrimary} onClick={handleStart} disabled={isLoading}>
                     {isLoading ? (
                         <SeboothLogo variant="mini" className={styles.ctaLoader} label="Memuat" />
@@ -463,6 +466,7 @@ function Landing(): JSX.Element {
                         </>
                     )}
                 </button>
+                )}
             </section>
 
             {/* ── LIVE PREVIEW: clean card in the bottom-left, camera aspect kept, nothing drawn over it ── */}
@@ -477,7 +481,15 @@ function Landing(): JSX.Element {
                         const cardH = fitsHeight ? liveArea.height : liveArea.width / aspect
                         const zoom = config.digitalZoom && config.digitalZoom > 1 ? ` scale(${config.digitalZoom})` : ''
                         return (
-                            <div className={styles.liveCard} style={{ width: cardW, height: cardH }}>
+                            <div
+                                className={`${styles.liveCard} ${tapToStart ? styles.tapStart : ''}`}
+                                style={{ width: cardW, height: cardH }}
+                                onClick={tapToStart && !isLoading ? handleStart : undefined}
+                            >
+                                {tapToStart && <SeboothLogo theme="royal" className={styles.tapLogo} />}
+                                {tapToStart && (isLoading
+                                    ? <SeboothLogo variant="mini" className={styles.tapLoader} label="Memuat" />
+                                    : <span className={styles.tapHint}>Ketuk disini untuk mulai sesi</span>)}
                                 <video
                                     ref={videoRef}
                                     className={styles.liveVideo}
