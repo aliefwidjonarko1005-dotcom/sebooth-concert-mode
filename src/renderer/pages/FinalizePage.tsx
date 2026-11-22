@@ -24,8 +24,9 @@ function FinalizePage(): JSX.Element | null {
     const [preview, setPreview] = useState<string | null>(null)
     const printStarted = useRef(false)
     // Add-on: after the mirror choice, a full-page step asks how many strips to print (null = mirror step)
+    const touch = useInputMode() === 'touch'
     const defaultQty = config.concertPrintQuantity || 2
-    const [qty, setQty] = useState<number | null>(null)
+    const [qty, setQty] = useState<number | null>(() => (touch ? defaultQty : null))
 
     const frame = frames.find(f => f.id === currentSession?.frameId) || null
 
@@ -39,8 +40,9 @@ function FinalizePage(): JSX.Element | null {
         return [...photos, ...missing]
     }, [frame, photos])
 
+    // Touch booth: the mirror was chosen on the retake page; portrait picks it here (first step)
     useEffect(() => {
-        setIsMirrored(!!config.mirrorOutput)
+        if (!touch) setIsMirrored(!!config.mirrorOutput)
     }, [])
 
     useEffect(() => {
@@ -129,7 +131,8 @@ function FinalizePage(): JSX.Element | null {
     }, [preview, currentSession, frame, photos, sessionPhotos, isMirrored, config, activeEvent, updateConfig, setPickupLabel, navigate, qty, defaultQty])
 
     // Below 2 the quantity step goes back to the mirror step
-    const lessQty = useCallback(() => setQty(q => (q === null || q <= 2 ? null : q - 2)), [])
+    // Touch booth has no mirror step to go back to, so it stops at 2
+    const lessQty = useCallback(() => setQty(q => (q === null ? null : q <= 2 ? (touch ? q : null) : q - 2)), [touch])
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -154,9 +157,8 @@ function FinalizePage(): JSX.Element | null {
         return () => window.removeEventListener('keydown', handleKeyDown)
     }, [isMirrored, setIsMirrored, preview, qty, defaultQty, lessQty, handlePrint])
 
-    const touch = useInputMode() === 'touch'
     useButtonHints(!preview || photos.length === 0 ? {} : qty !== null ? {
-        1: { label: qty <= 2 ? 'Kembali' : 'Kurangi', onScreen: true },
+        1: qty <= 2 ? (touch ? null : { label: 'Kembali', onScreen: true }) : { label: 'Kurangi', onScreen: true },
         2: { label: 'Tambah', onScreen: true },
         3: { label: `Cetak ${qty} foto`, primary: true, onScreen: true }
     } : {
@@ -189,9 +191,7 @@ function FinalizePage(): JSX.Element | null {
                     <button type="button" className={styles.qtyBtn} onClick={() => setQty(qty + 2)} aria-label="Tambah">+</button>
                 </div>
                 <p className={styles.sheets}>{qty / 2} lembar cetak</p>
-                {touch
-                    ? <button type="button" className={styles.backLink} onClick={() => setQty(null)}>Kembali</button>
-                    : <span className={styles.mirrorHint}>Tekan 1 untuk kurangi, 2 untuk tambah</span>}
+                {!touch && <span className={styles.mirrorHint}>Tekan 1 untuk kurangi, 2 untuk tambah</span>}
 
                 <button className={styles.printCue} onClick={() => handlePrint(qty)}>
                     {touch ? (

@@ -1356,6 +1356,8 @@ function CaptureSession(): JSX.Element {
                                     src={lastCapturedImage}
                                     alt="Captured"
                                     className={styles.previewImage}
+                                    // Same as the live view, which is always shown mirrored
+                                    style={{ transform: 'scaleX(-1)' }}
                                 />
                                 <div className={styles.previewBadge}>
                                     Foto {captureSlots.findIndex(s => s.id === currentFrame.slots[currentSlotIndex]?.id) + 1} tersimpan
