@@ -22,6 +22,15 @@
       "port": 5173
     },
     {
+      "name": "kiosk-updates-dev-cdp",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd /d .claude\\worktrees\\kiosk-updates && npx electron-vite dev --remoteDebuggingPort 9222"
+      ],
+      "port": 5173
+    },
+    {
       "name": "sebooth-preview-build",
       "runtimeExecutable": "npx",
       "runtimeArgs": [
