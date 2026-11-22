@@ -486,3 +486,63 @@
 :global(body.app-portrait) .container.hasLiveCam .ctaPrimary { font-size: 20px; padding: 10px 22px; }
 :global(body.app-portrait) .container.hasLiveCam .ctaKey { width: 40px; height: 40px; font-size: 24px; }
 :global(body.app-portrait) .liveArea { margin: 0 20px 68px; }
+
+/* ══ LANDSCAPE (touch booth) ONLY ══ Portrait must never be affected by rules below.
+   Live camera on: tapping the camera card starts the session. The hero is hidden; the animated logo
+   sits on the card (top centre), the card is centred and as large as the stage allows, its pill is the only text. */
+:global(body.app-landscape) .container.tapToStart .hero { display: none; }
+:global(body.app-landscape) .container.tapToStart .liveArea {
+    margin: 8px 24px 64px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Touch dock (e.g. Canon zoom in/out) sits at the bottom: keep the card and its pill above it */
+:global(body.app-landscape.has-dock) .container.tapToStart .liveArea { margin-bottom: 120px; }
+
+.liveCard.tapStart {
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+/* Pill sticker on the bottom edge of the camera card: the one main object of this screen */
+.tapHint {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%) rotate(-1.5deg);
+    padding: 12px 28px;
+    border-radius: var(--radius-full);
+    background: #FFFFFF;
+    color: var(--brand-ink);
+    border: 4px solid var(--brand-ink);
+    box-shadow: 0 6px 0 var(--brand-ink);
+    font-size: min(28px, 3.2vh);
+    font-weight: 800;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.tapLoader {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    top: 50%;
+    width: 120px;
+    height: 80px;
+    transform: translate(-50%, -50%);
+    color: #FFFFFF;
+}
+
+/* Animated wordmark over the live preview, top centre */
+.tapLogo {
+    position: absolute;
+    z-index: 2;
+    left: 50%;
+    top: 6%;
+    width: min(46%, 520px);
+    transform: translateX(-50%);
+    filter: drop-shadow(0 4px 0 var(--brand-ink));
+    pointer-events: none;
+}
