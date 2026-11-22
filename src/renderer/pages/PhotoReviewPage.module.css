@@ -573,3 +573,26 @@
 .navArrowRight {
     right: 20px;
 }
+
+/* ══ LANDSCAPE (touch booth) ONLY ══ concert mirror toggle in the header (only rendered in touch mode) */
+.mirrorBtn {
+    margin-top: 76px;
+    margin-left: auto;
+    margin-right: 12px;
+    min-height: 56px;
+    padding: 8px 24px;
+    border-radius: var(--radius-full);
+    border: var(--ink-line);
+    background: var(--brand-ink);
+    color: #FFFFFF;
+    font-family: inherit;
+    font-size: 20px;
+    font-weight: 900;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.mirrorBtn.mirrorOn {
+    background: var(--brand-sun);
+    color: var(--brand-ink);
+}

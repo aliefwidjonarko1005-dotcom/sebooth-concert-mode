@@ -9,9 +9,12 @@ import { useSwipe } from '../lib/useSwipe'
 import { useElementSize } from '../lib/useElementHeight'
 import { useButtonHints, useInputMode } from '../components/ButtonRail/ButtonRail'
 
+// Session whose mirror flag was already set from the admin default (survives the capture/retake round trips)
+let mirrorSessionId: string | null = null
+
 function PhotoReviewPage(): JSX.Element | null {
     const navigate = useNavigate()
-    const { currentSession, photos, removePhoto, endSession, deadline, updatePhoto } = useSessionStore()
+    const { currentSession, photos, removePhoto, endSession, deadline, updatePhoto, isMirrored, setIsMirrored } = useSessionStore()
     const { frames } = useFrameStore()
     const { config } = useAppConfig()
     const isConcert = !!config.concertMode
@@ -38,6 +41,16 @@ function PhotoReviewPage(): JSX.Element | null {
     const bottomSize = useElementSize(bottomRef)
     const touch = useInputMode() === 'touch'
     const single = touch || config.appOrientation === 'portrait'
+    // Concert on the touch booth: the mirror choice lives here (portrait still picks it on /finalize)
+    const mirrorHere = isConcert && touch
+
+    // Start each session from the admin default once; retakes come back here and must keep the customer's choice
+    useEffect(() => {
+        if (!mirrorHere || !currentSession || mirrorSessionId === currentSession.id) return
+        mirrorSessionId = currentSession.id
+        setIsMirrored(!!config.mirrorOutput)
+    }, [mirrorHere, currentSession, config.mirrorOutput, setIsMirrored])
+    const flip = mirrorHere && isMirrored ? ' scaleX(-1)' : ''
 
     // Redirect if no session or photos
     useEffect(() => {
@@ -329,6 +342,15 @@ function PhotoReviewPage(): JSX.Element | null {
                             Foto <em className="kiosk-num">{activeIndex + 1}</em> <span className="kiosk-num">/ {captureSlots.length}</span>
                         </h1>
                     </div>
+                    {mirrorHere && (
+                        <button
+                            type="button"
+                            className={`${styles.mirrorBtn} ${isMirrored ? styles.mirrorOn : ''}`}
+                            onClick={() => setIsMirrored(!isMirrored)}
+                        >
+                            Mirror {isMirrored ? 'ON' : 'OFF'}
+                        </button>
+                    )}
                     <button onClick={handleBackHome} className={styles.backBtn}>Batal</button>
                 </header>
 
@@ -377,7 +399,7 @@ function PhotoReviewPage(): JSX.Element | null {
                                                     alt={`Slot ${slot.id}`}
                                                     className={styles.slotImage}
                                                     style={{
-                                                        transform: `translate(${photo.panX || 0}px, ${photo.panY || 0}px) scale(${photo.scale || 1})`,
+                                                        transform: `translate(${photo.panX || 0}px, ${photo.panY || 0}px) scale(${photo.scale || 1})${flip}`,
                                                         transformOrigin: 'center center'
                                                     }}
                                                 />
@@ -475,7 +497,7 @@ function PhotoReviewPage(): JSX.Element | null {
                                                             }
                                                         }}
                                                         style={{
-                                                            transform: `translate(${(photo.panX || 0) * cardSlotRatio}px, ${(photo.panY || 0) * cardSlotRatio}px) scale(${photo.scale || 1})`,
+                                                            transform: `translate(${(photo.panX || 0) * cardSlotRatio}px, ${(photo.panY || 0) * cardSlotRatio}px) scale(${photo.scale || 1})${flip}`,
                                                             transformOrigin: 'center center',
                                                             pointerEvents: 'none',
                                                             userSelect: 'none'
