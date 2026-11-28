@@ -55,6 +55,7 @@ export class ConfigService {
         concertMode: false,
         concertSessionSeconds: 240,
         concertPrintQuantity: 2,
+        concertQtySeconds: 15,
         boothCode: 'B1',
         concertCounter: 0,
         buttonRailEnabled: true,

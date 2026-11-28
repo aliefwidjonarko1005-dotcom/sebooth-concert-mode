@@ -176,7 +176,14 @@ function FinalizePage(): JSX.Element | null {
 
     return (
         <motion.div className={styles.container} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <SessionTimer duration={AUTO_PRINT_SECONDS} onTimeout={() => handlePrint()} enabled={!!preview} label="Cetak otomatis" />
+            {/* Each step has its own countdown: the quantity step restarts with the Admin-set time (concertQtySeconds) */}
+            <SessionTimer
+                key={qty === null ? 'mirror' : 'qty'}
+                duration={qty === null ? AUTO_PRINT_SECONDS : Math.max(5, config.concertQtySeconds ?? 15)}
+                onTimeout={() => handlePrint()}
+                enabled={!!preview}
+                label="Cetak otomatis"
+            />
 
             {qty !== null ? (
             <section className={styles.info}>

@@ -239,6 +239,7 @@ export interface AppConfig {
     concertMode?: boolean
     concertSessionSeconds?: number // one budget for capture + retake (default 240)
     concertPrintQuantity?: number  // fixed strips per session (default 2 = 1 sheet)
+    concertQtySeconds?: number     // time on the 'Mau cetak berapa?' step before it prints the picked number (default 15)
     boothCode?: string             // short code printed on pickup label, e.g. 'B2'
     concertCounter?: number        // last used session number on this booth
 

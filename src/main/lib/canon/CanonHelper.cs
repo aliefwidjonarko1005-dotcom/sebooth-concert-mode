@@ -62,6 +62,10 @@ namespace CanonHelper
                 }
                 _cameraRef = (IntPtr)handleField.GetValue(_camera);
 
+                // A live photo recording cut short (app closed mid-countdown) leaves the body in movie mode,
+                // where every still is refused (0x8D0C) and SaveTo is unavailable: always start in still mode
+                ExitMovieMode();
+
                 // Set SaveTo to Camera-only (1) so the photo is reliably written to the SD card.
                 try
                 {
@@ -434,7 +438,16 @@ namespace CanonHelper
                     }
                     catch
                     {
-                        _camera.TakePicture();
+                        try
+                        {
+                            _camera.TakePicture();
+                        }
+                        catch
+                        {
+                            // 0x8D0C TAKE_PICTURE_SPECIAL_MOVIE_MODE_NG: body still in movie mode, switch back and retry once
+                            ExitMovieMode();
+                            _camera.TakePictureNoAf();
+                        }
                     }
 
                     // 3. Poll for new photo on camera memory card
@@ -514,6 +527,23 @@ namespace CanonHelper
         // shutter follows the countdown). REC_FETCH <path>: download + delete the clip after the shot.
         private static HashSet<string> _recKnownFiles = null;
         private static NewFile _recPending = null;
+
+        // Stop any recording and leave movie mode (no-op when the body is already in still mode)
+        private static void ExitMovieMode()
+        {
+            try
+            {
+                SetRecord(0);
+                uint err = EdsSendCommand_Pin(_cameraRef, kEdsCameraCommand_MovieSelectSwOFF, 0);
+                if (err == 0) Console.WriteLine("STATUS:MOVIE_MODE_OFF");
+                Thread.Sleep(500);
+                EdsGetEvent_Pin();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("WARNING:ExitMovieMode - " + ex.Message);
+            }
+        }
 
         private static uint SetRecord(uint value)
         {

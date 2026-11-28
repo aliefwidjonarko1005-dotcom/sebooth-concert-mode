@@ -538,7 +538,7 @@ function OutputPage(): JSX.Element | null {
                         <span className={styles.btnLabel}>Selanjutnya</span>
                         <span className={styles.btnSublabel}>Media berikutnya</span>
                     </div>
-                </button>
+                </button>[]
 
                 {/* Button 3: Lanjutkan */}
                 <button

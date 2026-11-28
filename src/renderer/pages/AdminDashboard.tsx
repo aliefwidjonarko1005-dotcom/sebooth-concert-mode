@@ -1570,6 +1570,17 @@ function AdminDashboard(): JSX.Element {
                                             />
                                         </label>
                                         <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontWeight: 700 }}>
+                                            Waktu pilih jumlah cetak (detik)
+                                            <input
+                                                type="number"
+                                                min={5}
+                                                max={120}
+                                                value={config.concertQtySeconds ?? 15}
+                                                onChange={(e) => updateConfig({ concertQtySeconds: Math.min(120, Number(e.target.value) || 15) })}
+                                                style={{ width: '160px', padding: '10px 14px', fontSize: '14px', borderRadius: '8px', border: '1px solid var(--color-border)', background: 'var(--color-bg-tertiary)', color: 'white' }}
+                                            />
+                                        </label>
+                                        <label style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontWeight: 700 }}>
                                             Kode booth (label loket)
                                             <input
                                                 type="text"

@@ -14,6 +14,8 @@
             box-sizing: border-box;
         }
 
+
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
@@ -302,7 +304,8 @@
 
 <body>
     <!-- LOUD DEBUG BANNER -->
-    <div style="background: red; color: white; padding: 10px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 9999;">
+    <div
+        style="background: red; color: white; padding: 10px; text-align: center; font-weight: bold; position: sticky; top: 0; z-index: 9999;">
         DATABASE TERHUBUNG - VERSI 2.0
     </div>
     <div id="app">
@@ -346,7 +349,7 @@
             if (sessionId) {
                 try {
                     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    
+
                     // 1. Fetch the session info
                     const { data: sessionData, error: sessionError } = await supabase
                         .from('sessions')
@@ -374,10 +377,10 @@
                         strip = stripItem ? stripItem.url : null;
                         live = videoItem ? videoItem.url : (gifItem ? gifItem.url : null);
                         photos = captureItems.map(m => m.url);
-                        
+
                         // If no captures but we have a strip, maybe use strip as photo?
                         // But usually 'capture' is what we want for the grid.
-                        
+
                         // Handle cases where GIF is 'live' or Video is 'live'
                     }
                 } catch (err) {
